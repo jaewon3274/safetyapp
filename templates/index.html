@@ -1,0 +1,2346 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPARK리조트 안전관리시스템</title>
+  <meta name="description" content="IPARK리조트 사업장 현황 관리 플랫폼">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-card: #1c2230;
+      --bg-hover: #21283a;
+      --border: #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --accent: #58a6ff;
+      --accent-dark: #1f6feb;
+      --success: #3fb950;
+      --danger: #f85149;
+      --warning: #d29922;
+      --amber: #f0b429;
+      --purple: #a5a5ff;
+      --sidebar-w: 220px;
+    }
+    
+    :root.light-theme {
+      --bg-primary: #f6f8fa;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-hover: #eaeef2;
+      --border: #d0d7de;
+      --text-primary: #24292f;
+      --text-secondary: #57606a;
+      --text-muted: #8c959f;
+      --accent: #0969da;
+      --accent-dark: #0550ae;
+      --success: #1a7f37;
+      --danger: #cf222e;
+      --warning: #9a6700;
+      --amber: #bf8700;
+      --purple: #8250df;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 500;
+      transition: all .15s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      filter: brightness(1.15);
+    }
+
+    .btn-primary {
+      background: var(--accent-dark);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: rgba(248, 81, 73, .15);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      border-color: var(--border);
+    }
+
+    .btn-success {
+      background: rgba(63, 185, 80, .15);
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+
+    /* ── Forms ── */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color .2s;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    select.form-control option {
+      background: var(--bg-secondary);
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    /* ── Tables ── */
+    .table-scroll {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: rgba(255, 255, 255, .03);
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, .04);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .fw-600 {
+      font-weight: 600;
+    }
+
+    .td-muted {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .td-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-green {
+      background: rgba(63, 185, 80, .15);
+      color: var(--success);
+      border: 1px solid rgba(63, 185, 80, .3);
+    }
+
+    .badge-red {
+      background: rgba(248, 81, 73, .15);
+      color: var(--danger);
+      border: 1px solid rgba(248, 81, 73, .3);
+    }
+
+    .badge-amber {
+      background: rgba(240, 180, 41, .15);
+      color: var(--amber);
+      border: 1px solid rgba(240, 180, 41, .3);
+    }
+
+    .badge-blue {
+      background: rgba(88, 166, 255, .15);
+      color: var(--accent);
+      border: 1px solid rgba(88, 166, 255, .3);
+    }
+
+    .badge-gray {
+      background: rgba(110, 118, 129, .15);
+      color: var(--text-muted);
+      border: 1px solid rgba(110, 118, 129, .3);
+    }
+
+    /* ── Loading / Empty ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      gap: 10px;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 36px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
+      min-width: 260px;
+      animation: slideIn .25s ease;
+      font-size: 13px;
+    }
+
+    .toast.success {
+      border-left: 3px solid var(--success);
+    }
+
+    .toast.error {
+      border-left: 3px solid var(--danger);
+    }
+
+    .toast.info {
+      border-left: 3px solid var(--accent);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      width: 90%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+      animation: modalIn .2s ease;
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: scale(.96);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px;
+      border-radius: 6px;
+    }
+
+    .modal-close:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .modal-msg {
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ════════════════════════════════════
+   LOGIN SCREEN
+   ════════════════════════════════════ */
+    #login-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+
+    .login-box {
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .login-logo h1 {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #58a6ff, #a5a5ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .login-logo p {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .login-tabs {
+      display: flex;
+      gap: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+
+    .login-tab {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all .15s;
+    }
+
+    .login-tab.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .login-panel {
+      display: none;
+    }
+
+    .login-panel.active {
+      display: block;
+    }
+
+    .login-note {
+      font-size: 12px;
+      color: var(--amber);
+      margin-top: 12px;
+      font-weight: 600;
+      background: rgba(240, 180, 41, .08);
+      border: 1px solid rgba(240, 180, 41, .2);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    .login-divider {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin: 16px 0;
+    }
+
+    .login-request-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* ════════════════════════════════════
+   APP LAYOUT
+   ════════════════════════════════════ */
+    #app {
+      display: none;
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 18px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .sidebar-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .sidebar-section {
+      padding: 12px 10px 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      font-weight: 600;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin: 1px 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .15s;
+      user-select: none;
+    }
+
+    .sidebar-item:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .sidebar-item.active {
+      background: rgba(88, 166, 255, .12);
+      color: var(--accent);
+    }
+
+    .sidebar-item .badge-count {
+      margin-left: auto;
+      background: var(--danger);
+      color: #fff;
+      border-radius: 20px;
+      padding: 1px 7px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .sidebar-user {
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+
+    .sidebar-user span {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* ── Main Content ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      height: 52px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .topbar-title {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .topbar-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    .topbar-nav button {
+      padding: 5px 10px;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .topbar-nav button:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .content {
+      padding: 24px;
+      flex: 1;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Stat Cards ── */
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .stat-blue {
+      border-top: 3px solid var(--accent);
+    }
+
+    .stat-green {
+      border-top: 3px solid var(--success);
+    }
+
+    .stat-amber {
+      border-top: 3px solid var(--amber);
+    }
+
+    .stat-purple {
+      border-top: 3px solid var(--purple);
+    }
+
+    /* ── Page sections ── */
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ════════ TOAST ════════ -->
+  <div id="toast-container"></div>
+
+  <!-- ════════ LOGIN ════════ -->
+  <div id="login-screen">
+    <div class="login-box">
+      <div class="login-logo">
+        <h1>IPARK리조트 안전관리시스템</h1>
+        <p>사업장 현황 관리 플랫폼</p>
+      </div>
+      <div class="login-tabs">
+        <div class="login-tab active" onclick="switchLoginTab('admin')" id="tab-admin">🔐 관리자</div>
+        <div class="login-tab" onclick="switchLoginTab('empl')" id="tab-empl">👷 직원</div>
+      </div>
+
+      <!-- 관리자 로그인 -->
+      <div class="login-panel active" id="panel-admin">
+        <div class="form-group">
+          <label>관리자 ID</label>
+          <input class="form-control" id="admin-id" placeholder="ID를 입력하세요" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>비밀번호</label>
+          <input class="form-control" type="password" id="admin-pw" placeholder="비밀번호를 입력하세요"
+            autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;"
+          onclick="doLogin('admin')">로그인</button>
+      </div>
+
+      <!-- 직원 로그인 -->
+      <div class="login-panel" id="panel-empl">
+        <div class="form-group">
+          <label>이름</label>
+          <input class="form-control" id="empl-name" placeholder="성명을 입력하세요">
+        </div>
+        <div class="form-group">
+          <label>부서 / 팀 <span style="color:var(--text-muted);font-size:12px;">(선택)</span></label>
+          <input class="form-control" id="empl-dept" placeholder="부서 또는 팀명">
+        </div>
+        <div class="form-group">
+          <label>비밀번호</label>
+          <input class="form-control" type="password" id="empl-pw" placeholder="비밀번호 입력">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;"
+          onclick="doLogin('employee')">로그인</button>
+        <div class="login-note">⚠️ 관리자의 승인을 받은 계정만 로그인 가능합니다.</div>
+        <div class="login-divider">— 계정이 없으신가요? —</div>
+        <button class="btn btn-secondary login-request-btn" onclick="openRegisterModal()">📝 계정 신청</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ APP ════════ -->
+  <div id="app">
+    <div class="layout">
+
+      <!-- SIDEBAR -->
+      <nav class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">IPARK리조트<br>안전관리시스템</div>
+          <div class="sidebar-sub">사업장 현황 관리 플랫폼</div>
+        </div>
+        <div style="flex:1;">
+          <div class="sidebar-section">메뉴</div>
+          <div class="sidebar-item active" onclick="navigateTo('dashboard')" id="nav-dashboard">📊 대시보드</div>
+          <div class="sidebar-section">공사 정보</div>
+          <div class="sidebar-item" onclick="navigateTo('project')" id="nav-project">🏗️ 공사정보 관리</div>
+          <div class="sidebar-item" onclick="navigateTo('workers')" id="nav-workers">👷 근로자 이력정보</div>
+          <div class="sidebar-item" onclick="navigateTo('workplan')" id="nav-workplan">📋 작업계획서</div>
+          <div class="sidebar-item" onclick="navigateTo('tbm')" id="nav-tbm">📢 TBM 일지</div>
+          <div class="sidebar-section">자료</div>
+          <div class="sidebar-item" onclick="navigateTo('docs')" id="nav-docs">📁 문서 관리</div>
+          <div class="sidebar-item" onclick="navigateTo('notice')" id="nav-notice">📣 공지</div>
+          <div class="sidebar-section">시스템</div>
+          <div class="sidebar-item" onclick="navigateTo('auditlog')" id="nav-auditlog">📜 감사 로그</div>
+          <div class="sidebar-item" id="nav-accounts" onclick="navigateTo('accounts')">⚙️ 계정 관리 <span
+              class="badge-count" id="pending-badge" style="display:none">0</span></div>
+        </div>
+        <div class="sidebar-footer">
+          <div class="sidebar-user">👤 <span id="sidebar-username">-</span></div>
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center;margin-bottom:12px;"
+            onclick="doLogout()">로그아웃</button>
+          <div style="font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:8px;">문의 : 안전관리팀</div>
+          <button class="btn btn-secondary btn-sm" id="theme-toggle-btn" style="width:100%;justify-content:center;" onclick="toggleTheme()">☀️ 밝은 테마</button>
+        </div>
+      </nav>
+
+      <!-- MAIN -->
+      <div class="main">
+        <div class="topbar">
+          <button class="btn btn-secondary btn-sm" onclick="navigateTo('dashboard')" title="홈으로"
+            style="padding:5px 10px;font-size:16px;">🏠</button>
+          <div class="topbar-nav">
+            <button onclick="historyBack()">← 뒤로</button>
+            <button onclick="historyFwd()">앞으로 →</button>
+          </div>
+          <span>|</span>
+          <div class="topbar-title" id="topbar-title">대시보드</div>
+          <!-- 관리자 전용: 계정별 보기 필터 -->
+          <div id="admin-view-filter" style="display:none;margin-left:auto;display:none;align-items:center;gap:8px;">
+            <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">👁️ 계정별 보기:</label>
+            <select class="form-control" id="view-as-employee" style="max-width:160px;padding:5px 10px;font-size:13px;"
+              onchange="onViewAsChange()">
+              <option value="">전체 보기</option>
+            </select>
+          </div>
+        </div>
+        <div class="content">
+
+          <!-- ── DASHBOARD ── -->
+          <div class="page active" id="page-dashboard">
+            <div class="section-title">📊 대시보드</div>
+            <div class="section-desc" id="proj-name-label">현재 프로젝트를 불러오는 중...</div>
+            <div class="grid-3" style="margin-bottom:20px;" id="stat-cards">
+              <div class="stat-card stat-blue">
+                <div class="stat-value" id="stat-docs">-</div>
+                <div class="stat-label">전체 문서</div>
+              </div>
+              <div class="stat-card stat-green">
+                <div class="stat-value" id="stat-workers">-</div>
+                <div class="stat-label">등록 근로자</div>
+              </div>
+              <div class="stat-card stat-amber">
+                <div class="stat-value" id="stat-tbm">-</div>
+                <div class="stat-label">TBM 건수</div>
+              </div>
+              <div class="stat-card stat-purple">
+                <div class="stat-value" id="stat-workplans">-</div>
+                <div class="stat-label">작업계획서</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">📝 최근 등록된 글</div>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>제목</th>
+                      <th>작성자</th>
+                      <th>작성일</th>
+                      <th>첨부파일</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-notice-tbody">
+                    <tr>
+                      <td colspan="4">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── PROJECT INFO ── -->
+          <div class="page" id="page-project">
+            <div class="section-title">🏗️ 공사정보 관리</div>
+            <div class="section-desc">현장 공사 정보를 등록하고 관리합니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">공사 목록</div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-primary btn-sm" id="proj-add-btn" onclick="openAddProjectModal()">+ 새 공사 추가</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="proj-view">
+                  <div class="loading"><div class="spinner"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── NOTICE ── -->
+          <div class="page" id="page-notice">
+            <div class="section-title">📣 공지</div>
+            <div class="section-desc">관리자가 등록한 공지사항을 확인합니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">공지 목록</div>
+                <button class="btn btn-primary btn-sm" id="add-notice-btn" onclick="openNoticeModal()" style="display:none;">+ 공지 등록</button>
+              </div>
+              <div id="notice-list" style="padding:8px 0;">
+                <div class="loading"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── WORKERS ── -->
+          <div class="page" id="page-workers">
+            <div class="section-title">👷 근로자 이력정보</div>
+            <div class="section-desc">현장 근로자 정보를 관리합니다.</div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title" style="display:flex;align-items:center;gap:12px;">
+                  근로자 목록
+                  <select id="filter-workers-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadWorkers()">
+                    <option value="all">전체 현장</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" id="add-worker-btn" onclick="openWorkerModal(null)">+ 근로자 추가</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>이름</th>
+                      <th>직종</th>
+                      <th>국적</th>
+                      <th>입사일</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workers-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── WORKPLAN ── -->
+          <div class="page" id="page-workplan">
+            <div class="section-title">📋 작업계획서</div>
+            <div class="section-desc">일별 작업계획서를 등록하고 관리합니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title" style="display:flex;align-items:center;gap:12px;">
+                  작업계획서 목록
+                  <select id="filter-workplan-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadWorkplans()">
+                    <option value="all">전체 현장</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" id="add-wp-btn" onclick="openWpModal(null)">+ 작성</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>작업일</th>
+                      <th>작업 내용</th>
+                      <th>담당자</th>
+                      <th>상태</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wp-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── TBM ── -->
+          <div class="page" id="page-tbm">
+            <div class="section-title">📢 TBM 일지</div>
+            <div class="section-desc">Tool Box Meeting 일지를 기록합니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title" style="display:flex;align-items:center;gap:12px;">
+                  TBM 목록
+                  <select id="filter-tbm-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadTbmList()">
+                    <option value="all">전체 현장</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" id="add-tbm-btn" onclick="openTbmModal(null)">+ 작성</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>날짜</th>
+                      <th>작업 내용 및 위험 요소</th>
+                      <th>안전 조치 사항</th>
+                      <th>작성자</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbm-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── DOCS ── -->
+          <div class="page" id="page-docs">
+            <div class="section-title">📁 문서 관리</div>
+            <div class="section-desc">현장 관련 문서를 업로드하고 관리합니다.</div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-body">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <input class="form-control" id="doc-search" placeholder="문서 검색..." style="max-width:260px;"
+                    oninput="filterDocs()">
+                  <select class="form-control" id="doc-cat-filter" style="max-width:180px;" onchange="filterDocs()">
+                    <option value="">전체 카테고리</option>
+                    <option>공사정보</option>
+                    <option>작업관리</option>
+                    <option>교육</option>
+                    <option>위험성평가</option>
+                  </select>
+                  <button class="btn btn-primary btn-sm" id="upload-doc-btn" onclick="openUploadModal()">📤 업로드</button>
+                </div>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>문서명</th>
+                    <th>카테고리</th>
+                    <th>업로드자</th>
+                    <th>날짜</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="docs-tbody">
+                  <tr>
+                    <td colspan="5">
+                      <div class="loading">
+                        <div class="spinner"></div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ── AUDIT LOG ── -->
+          <div class="page" id="page-auditlog">
+            <div class="section-title">📜 감사 로그</div>
+            <div class="section-desc">시스템 활동 기록을 확인합니다.</div>
+            <div class="card">
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>시간</th>
+                      <th>사용자</th>
+                      <th>역할</th>
+                      <th>액션</th>
+                      <th>상세</th>
+                    </tr>
+                  </thead>
+                  <tbody id="audit-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── ACCOUNTS ── -->
+          <div class="page" id="page-accounts">
+            <div class="section-title">⚙️ 계정 관리</div>
+            <div class="section-desc">직원 계정 신청 및 권한 관리 (관리자 전용)</div>
+
+            <!-- 탭 -->
+            <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" id="acc-tab-pending" onclick="switchAccTab('pending')"
+                style="border-color:var(--amber);color:var(--amber);">⏳ 계정 신청 대기</button>
+              <button class="btn btn-secondary btn-sm" id="acc-tab-employees" onclick="switchAccTab('employees')">👥 직원
+                계정 목록</button>
+              
+            </div>
+
+            <!-- 신청 대기 목록 -->
+            <div id="acc-panel-pending" class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">⏳ 계정 신청 목록</div>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:70px;text-align:center;"><input type="checkbox" onclick="document.querySelectorAll('.emp-checkbox').forEach(cb => cb.checked = this.checked)"> No.</th>
+                      <th>신청자</th>
+                      <th>부서</th>
+                      <th>팀</th>
+                      <th>상태</th>
+                      <th>신청일시</th>
+                      <th>검토자</th>
+                      <th>처리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pending-tbody">
+                    <tr>
+                      <td colspan="7">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 직원 계정 목록 -->
+            <div id="acc-panel-employees" class="card" style="display:none;">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">👥 직원 계정 목록</div>
+                <button class="btn btn-danger btn-sm" onclick="deleteSelectedEmployees()" style="margin-left:auto;">🗑️ 선택 삭제</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:70px;text-align:center;"><input type="checkbox" onclick="document.querySelectorAll('.emp-checkbox').forEach(cb => cb.checked = this.checked)"> No.</th>
+                      <th>이름</th>
+                      <th>부서</th>
+                      <th>팀</th>
+                      <th>상태</th>
+                      <th>등록일</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="employees-tbody">
+                    <tr>
+                      <td colspan="6">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 휴지통 -->
+            <div id="acc-panel-trash" class="card" style="display:none;">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">🗑️ 삭제된 계정 (휴지통)</div>
+                <p style="font-size:12px;color:var(--text-muted);">삭제된 계정을 복구할 수 있습니다.</p>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>이름</th>
+                      <th>부서</th>
+                      <th>팀</th>
+                      <th>삭제일</th>
+                      <th>복구</th>
+                    </tr>
+                  </thead>
+                  <tbody id="trash-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /content -->
+      </div><!-- /main -->
+    </div><!-- /layout -->
+  </div><!-- /app -->
+
+  <!-- ════════ MODALS ════════ -->
+
+  <!-- 계정 신청 모달 -->
+  <div class="modal-overlay" id="modal-register">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">📝 계정 신청</div>
+        <button class="modal-close" onclick="closeModal('modal-register')">✕</button>
+      </div>
+      <div class="form-group"><label>이름 *</label><input class="form-control" id="reg-name" placeholder="성명 입력"></div>
+      <div class="form-group"><label>부서 *</label><input class="form-control" id="reg-dept" placeholder="소속 부서"></div>
+      <div class="form-group"><label>팀</label><input class="form-control" id="reg-team" placeholder="소속 팀 (선택)"></div>
+      <div class="form-group"><label>비밀번호</label><input class="form-control" type="password" id="reg-pw"
+          placeholder="사용할 비밀번호"></div>
+      <div
+        style="font-size:12px;color:var(--amber);background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;">
+        ⚠️ 신청 후 관리자 승인 시 로그인 가능합니다.
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-register')">취소</button>
+        <button class="btn btn-primary" onclick="submitRegister()">신청</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 확인 모달 -->
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <div class="modal-title" id="confirm-title">확인</div>
+        <button class="modal-close" onclick="closeModal('modal-confirm')">✕</button>
+      </div>
+      <p class="modal-msg" id="confirm-msg"></p>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">취소</button>
+        <button class="btn btn-danger" id="confirm-ok-btn">삭제 확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 근로자 모달 -->
+  <div class="modal-overlay" id="modal-worker">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="worker-modal-title">근로자 추가</div>
+        <button class="modal-close" onclick="closeModal('modal-worker')">✕</button>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>이름 *</label><input class="form-control" id="w-name" required></div>
+        <div class="form-group"><label>직종</label><input class="form-control" id="w-job" placeholder="예: 철근공"></div>
+        <div class="form-group"><label>국적</label><input class="form-control" id="w-nation" placeholder="예: 한국"></div>
+        <div class="form-group"><label>입사일</label><input class="form-control" type="date" id="w-hire"></div>
+      </div>
+      <div class="form-group"><label>특이사항</label><textarea class="form-control" id="w-note" rows="2"></textarea></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-worker')">취소</button>
+        <button class="btn btn-primary" onclick="saveWorker()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TBM 모달 -->
+  <div class="modal-overlay" id="modal-tbm">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-header">
+        <div class="modal-title" id="tbm-modal-title">TBM 작성</div>
+        <button class="modal-close" onclick="closeModal('modal-tbm')">✕</button>
+      </div>
+      <div class="form-group"><label>날짜 *</label><input class="form-control" type="date" id="tbm-date"></div>
+      <div class="form-group"><label>작업 내용 및 위험 요소 *</label><textarea class="form-control" id="tbm-hazards" rows="3"
+          placeholder="작업 내용과 위험 요소를 입력하세요"></textarea></div>
+      <div class="form-group"><label>안전 조치 사항 *</label><textarea class="form-control" id="tbm-measures" rows="3"
+          placeholder="안전 조치 사항을 입력하세요"></textarea></div>
+      <div class="form-group"><label>특이사항</label><textarea class="form-control" id="tbm-notes" rows="2"></textarea>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 추가 (여러 장 선택 가능)</label><input class="form-control" type="file" id="tbm-photo" accept="image/*" multiple></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-tbm')">취소</button>
+        <button class="btn btn-primary" onclick="saveTbm()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 작업계획서 모달 -->
+  <div class="modal-overlay" id="modal-wp">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-header">
+        <div class="modal-title" id="wp-modal-title">작업계획서 작성</div>
+        <button class="modal-close" onclick="closeModal('modal-wp')">✕</button>
+      </div>
+      <div class="form-group"><label>작업일 *</label><input class="form-control" type="date" id="wp-date"></div>
+      <div class="form-group"><label>작업 내용 *</label><textarea class="form-control" id="wp-content" rows="3"></textarea>
+      </div>
+      <div class="form-group"><label>담당자</label><input class="form-control" id="wp-manager" placeholder="담당자명"></div>
+      <div class="form-group"><label>상태</label>
+        <select class="form-control" id="wp-status">
+          <option value="planned">계획</option>
+          <option value="in_progress">진행중</option>
+          <option value="completed">완료</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 추가 (여러 장 선택 가능)</label><input class="form-control" type="file" id="wp-photo" accept="image/*" multiple></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-wp')">취소</button>
+        <button class="btn btn-primary" onclick="saveWorkplan()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 공지 등록 모달 -->
+  <div class="modal-overlay" id="modal-notice">
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-header">
+        <div class="modal-title">📣 공지 등록</div>
+        <button class="modal-close" onclick="closeModal('modal-notice')">✕</button>
+      </div>
+      <div class="form-group"><label>제목 *</label><input class="form-control" id="notice-title" placeholder="공지 제목"></div>
+      <div class="form-group"><label>내용</label><textarea class="form-control" id="notice-content" rows="5" placeholder="공지 내용을 입력하세요"></textarea></div>
+      <div class="form-group">
+        <label>파일 첨부 (엑셀, 워드, PDF, PPT 등)</label>
+        <input class="form-control" type="file" id="notice-file"
+          accept=".xlsx,.xls,.doc,.docx,.pdf,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-notice')">취소</button>
+        <button class="btn btn-primary" onclick="saveNotice()">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 새 공사 추가/수정 모달 -->
+  <div class="modal-overlay" id="modal-add-project">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-header">
+        <div class="modal-title" id="project-modal-title">🏗️ 새 공사 추가</div>
+        <button class="modal-close" onclick="closeModal('modal-add-project')">✕</button>
+      </div>
+      <div class="grid-2" style="gap:12px;">
+        <div class="form-group"><label>공사명 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-name" placeholder="공사명을 입력하세요"></div>
+        <div class="form-group"><label>업체명 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-contractor" placeholder="시공사명"></div>
+        <div class="form-group"><label>착공일 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-start" placeholder="예: 20260101"
+            oninput="autoFormatDate(this)"></div>
+        <div class="form-group"><label>준공일 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-end" placeholder="예: 20281231"
+            oninput="autoFormatDate(this)"></div>
+        <div class="form-group"><label>공사금액 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-amount" placeholder="예: 1,500,000,000"
+            oninput="autoFormatAmount(this)"></div>
+        <div class="form-group"><label>공사담당자 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-manager" placeholder="현장소장명"></div>
+        <div class="form-group" style="grid-column:1/-1;"><label>현장 주소 <span style="color:#f85149">*</span></label>
+          <input class="form-control" id="np-location" placeholder="현장 주소를 입력하세요"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-add-project')">취소</button>
+        <button class="btn btn-primary" onclick="saveNewProject()">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 문서 업로드 모달 -->
+  <div class="modal-overlay" id="modal-upload">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">📤 문서 업로드</div>
+        <button class="modal-close" onclick="closeModal('modal-upload')">✕</button>
+      </div>
+      <div class="form-group"><label>문서명 *</label><input class="form-control" id="up-title" placeholder="문서 이름"></div>
+      <div class="form-group"><label>카테고리 *</label>
+        <select class="form-control" id="up-cat">
+          <option>공사정보</option>
+          <option>작업관리</option>
+          <option>교육</option>
+          <option>위험성평가</option>
+        </select>
+      </div>
+      <div class="form-group"><label>파일 선택 *</label><input class="form-control" type="file" id="up-file"></div>
+      <div class="form-group"><label>설명</label><textarea class="form-control" id="up-desc" rows="2"></textarea></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-upload')">취소</button>
+        <button class="btn btn-primary" onclick="uploadDoc()">업로드</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 이미지 확대보기 라이트박스 -->
+  <div id="lightbox-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;cursor:pointer;" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="확대 사진" style="max-width:92vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);"/>
+    <a id="lightbox-download" href="#" style="position:absolute;bottom:24px;right:36px;background:var(--accent);color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;" onclick="event.stopPropagation();">⬇️ 다운로드</a>
+    <button style="position:absolute;top:20px;right:28px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;" onclick="closeLightbox()">✕</button>
+  </div>
+
+  <!-- ════════ SCRIPT ════════ -->
+  <script>
+    // 테마 초기화
+    if (localStorage.getItem('theme') === 'light') {
+      document.documentElement.classList.add('light-theme');
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+      const btn = document.getElementById('theme-toggle-btn');
+      if (btn) btn.innerHTML = document.documentElement.classList.contains('light-theme') ? '🌙 어두운 테마' : '☀️ 밝은 테마';
+    });
+
+    function toggleTheme() {
+      const isLight = document.documentElement.classList.toggle('light-theme');
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+      const btn = document.getElementById('theme-toggle-btn');
+      if (btn) btn.innerHTML = isLight ? '🌙 어두운 테마' : '☀️ 밝은 테마';
+    }
+
+    const apiBase = '';
+
+    'use strict';
+
+    // ── State ──────────────────────────────────────────────
+    let currentUser = null;
+    let navHistory = [];
+    let navIndex = -1;
+    let editingWorkerId = null;
+    let editingTbmId = null;
+    let editingWpId = null;
+    let allDocs = [];
+
+    // ── Helpers ─────────────────────────────────────────────
+    function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function fmtDate(s) { return (s || '').replace('T', ' ').slice(0, 16); }
+    function fmtAuthor(name) {
+      if (!name) return '-';
+      if (name.includes('관리자 계정') || name.includes('안전관리팀') || name === '김관리 팀장' || name === 'safety') return '관리자';
+      return esc(name);
+    }
+
+    function openLightbox(src) {
+      const overlay = document.getElementById('lightbox-overlay');
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox-download').href = src + '/download';
+      overlay.style.display = 'flex';
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox-overlay').style.display = 'none';
+    }
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '오류가 발생했습니다.');
+      return data;
+    }
+
+    // ── Toast ────────────────────────────────────────────────
+    function toast(msg, type = 'info', dur = 3000) {
+      const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.innerHTML = `<span>${icons[type] || '📢'}</span><span>${esc(msg)}</span>`;
+      document.getElementById('toast-container').appendChild(el);
+      setTimeout(() => el.remove(), dur);
+    }
+
+    // ── Modal ─────────────────────────────────────────────────
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function confirm2(title, msg, onOk, okLabel, btnStyle) {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-msg').textContent = msg;
+      const btn = document.getElementById('confirm-ok-btn');
+      btn.textContent = okLabel || '확인';
+      btn.className = 'btn ' + (btnStyle || 'btn-danger');
+      btn.onclick = () => { closeModal('modal-confirm'); onOk(); };
+      openModal('modal-confirm');
+    }
+
+    // ── Navigation ───────────────────────────────────────────
+    function navigateTo(page, push = true) {
+      // 페이지 전환
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+      const pageEl = document.getElementById(`page-${page}`);
+      const navEl = document.getElementById(`nav-${page}`);
+      if (pageEl) pageEl.classList.add('active');
+      if (navEl) navEl.classList.add('active');
+      // 타이틀
+      const titles = { dashboard: '대시보드', project: '공사정보 관리', workers: '근로자 이력정보', workplan: '작업계획서', tbm: 'TBM 일지', docs: '문서 관리', auditlog: '감사 로그', accounts: '계정 관리', notice: '공지' };
+      document.getElementById('topbar-title').textContent = titles[page] || page;
+      // 히스토리
+      if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
+      // 데이터 로드
+      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+      if (loaders[page]) loaders[page]();
+      // 계정 관리는 관리자만
+      if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
+    }
+    function historyBack() { if (navIndex > 0) navigateTo(navHistory[--navIndex], false); }
+    function historyFwd() { if (navIndex < navHistory.length - 1) navigateTo(navHistory[++navIndex], false); }
+
+    // ── Auth ─────────────────────────────────────────────────
+    function switchLoginTab(tab) {
+      ['admin', 'empl'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+        document.getElementById(`panel-${t}`).classList.toggle('active', t === tab);
+      });
+    }
+
+    async function doLogin(type) {
+      try {
+        let body;
+        if (type === 'admin') {
+          body = { type: 'admin', login_id: document.getElementById('admin-id').value.trim(), password: document.getElementById('admin-pw').value };
+        } else {
+          body = { type: 'employee', name: document.getElementById('empl-name').value.trim(), department: document.getElementById('empl-dept').value.trim(), password: document.getElementById('empl-pw').value };
+        }
+        const data = await api('/api/auth/login', { method: 'POST', body: JSON.stringify(body) });
+        currentUser = data.user;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        
+        // 계정 이름 중복 표기 방지
+        let displayName = currentUser.name;
+        if (currentUser.role === 'admin' && !displayName.includes('안전관리팀')) displayName += ' (안전관리팀)';
+        else if (currentUser.role !== 'admin' && !displayName.includes('직원')) displayName += ' (직원)';
+        document.getElementById('sidebar-username').textContent = displayName;
+        
+        const isAdmin = currentUser.role === 'admin';
+        // 관리자만 노출: 계정 관리, 감사 로그
+        document.getElementById('nav-accounts').style.display = isAdmin ? '' : 'none';
+        document.getElementById('nav-auditlog').style.display = isAdmin ? '' : 'none';
+        // 관리자: 직원별 보기 필터 활성화
+        const filterEl = document.getElementById('admin-view-filter');
+        if (isAdmin) {
+          filterEl.style.display = 'flex';
+          loadEmployeeFilter();
+          loadPendingBadge();
+        } else {
+          filterEl.style.display = 'none';
+        }
+        await loadProjectDropdowns();
+        navigateTo('dashboard');
+        toast(`${currentUser.name}님 환영합니다!`, 'success');
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    function doLogout() {
+      currentUser = null;
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('admin-pw').value = '';
+      document.getElementById('empl-pw').value = '';
+      navHistory = []; navIndex = -1;
+    }
+
+    // 계정 신청
+    function openRegisterModal() { openModal('modal-register'); }
+    async function submitRegister() {
+      const name = document.getElementById('reg-name').value.trim();
+      const dept = document.getElementById('reg-dept').value.trim();
+      const team = document.getElementById('reg-team').value.trim();
+      const pw = document.getElementById('reg-pw').value || '0000';
+      if (!name || !dept) { toast('이름과 부서는 필수입니다.', 'error'); return; }
+      try {
+        const data = await api('/api/auth/register', { method: 'POST', body: JSON.stringify({ name, department: dept, team, password: pw }) });
+        toast(data.message, 'success');
+        closeModal('modal-register');
+        ['reg-name', 'reg-dept', 'reg-team', 'reg-pw'].forEach(id => document.getElementById(id).value = '');
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ── Pending Badge ─────────────────────────────────────────
+    async function loadPendingBadge() {
+      try {
+        const data = await api(`/api/auth/pending?userId=${currentUser?.id || ''}`);
+        const cnt = (data.pending || []).filter(p => p.status === 'pending').length;
+        const badge = document.getElementById('pending-badge');
+        badge.textContent = cnt;
+        badge.style.display = cnt > 0 ? 'inline' : 'none';
+      } catch (e) { }
+    }
+
+    // ── Accounts Management ───────────────────────────────────
+    function switchAccTab(tab) {
+      ['pending', 'employees', 'trash'].forEach(t => {
+        const panel = document.getElementById(`acc-panel-${t}`);
+        if (panel) panel.style.display = t === tab ? 'block' : 'none';
+        const btn = document.getElementById(`acc-tab-${t}`);
+        if (btn) { btn.style.borderColor = t === tab ? 'var(--amber)' : ''; btn.style.color = t === tab ? 'var(--amber)' : ''; }
+      });
+      if (tab === 'employees') loadEmployeeList();
+      if (tab === 'pending') loadAccountsPending();
+      if (tab === 'trash') loadTrashList();
+    }
+
+    async function loadAccountsPending() {
+      try {
+        const data = await api(`/api/auth/pending?userId=${currentUser?.id || ''}`);
+        const tbody = document.getElementById('pending-tbody');
+        const list = (data.pending || []).filter(p => p.status === 'pending');
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>신청 내역이 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = list.map((p, idx) => {
+          const statusBadge = p.status === 'pending' ? `<span class="badge badge-amber">⏳ 대기중</span>` : p.status === 'approved' ? `<span class="badge badge-green">✅ 승인</span>` : `<span class="badge badge-red">❌ 거절</span>`;
+          const actions = `
+        <div class="td-actions">
+          <button class="btn btn-sm" style="background:rgba(16,185,129,.2);border:1px solid #10b981;color:#10b981;" onclick="approveUser('${p.id}','${esc(p.name)}')">✅ 승인</button>
+          <button class="btn btn-sm" style="background:rgba(245,158,11,.2);border:1px solid #f59e0b;color:#f59e0b;" onclick="suspendPendingUser('${p.id}','${esc(p.name)}')">⏸ 미사용</button>
+          <button class="btn btn-sm" style="background:rgba(239,68,68,.2);border:1px solid #ef4444;color:#ef4444;" onclick="rejectUser('${p.id}','${esc(p.name)}')">🗑️ 거절</button>
+        </div>`;
+          return `<tr>
+        <td style="text-align:center;">${idx + 1}</td>
+        <td class="fw-600">${esc(p.name)}</td>
+        <td class="td-muted">${esc(p.department)}</td>
+        <td class="td-muted">${esc(p.team) || '-'}</td>
+        <td>${statusBadge}</td>
+        <td class="td-muted">${fmtDate(p.created_at)}</td>
+        <td class="td-muted">${esc(p.reviewed_by) || '-'}</td>
+        <td>${actions}</td>
+      </tr>`;
+        }).join('');
+      } catch (e) { toast('목록 로딩 실패: ' + e.message, 'error'); }
+    }
+
+    async function approveUser(pid, name) {
+      confirm2('계정 승인', `"${name}" 계정을 승인하시겠습니까?`, async () => {
+        try {
+          const data = await api(`/api/auth/approve/${pid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success');
+          loadAccountsPending(); loadPendingBadge();
+          switchAccTab('employees');
+        } catch (e) { toast(e.message, 'error'); }
+      }, '✅ 승인 확인', 'btn-primary');
+    }
+
+    async function suspendPendingUser(pid, name) {
+      confirm2('미사용 처리', `"${name}" 계정을 미사용 상태로 처리하시겠습니까?\n(로그인은 불가하지만 언제든 활성화 가능합니다.)`, async () => {
+        try {
+          const data = await api(`/api/auth/suspend-pending/${pid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success');
+          loadAccountsPending(); loadPendingBadge();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '⏸ 미사용 확인', 'btn-secondary');
+    }
+
+    async function rejectUser(pid, name) {
+      confirm2('계정 신청 삭제', `"${name}" 계정 신청을 삭제하시겠습니까?`, async () => {
+        try {
+          const data = await api(`/api/auth/reject/${pid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success');
+          loadAccountsPending(); loadPendingBadge();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '🗑️ 삭제 확인', 'btn-danger');
+    }
+
+    async function loadEmployeeList() {
+      try {
+        const data = await api(`/api/auth/employees?userId=${currentUser?.id || ''}`);
+        const tbody = document.getElementById('employees-tbody');
+        const list = data.employees || [];
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👥</div><p>등록된 직원이 없습니다.</p></div></td></tr>`; return; }
+        const activeList = list.filter(e => e.status !== 'deleted');
+        tbody.innerHTML = activeList.map((e, idx) => {
+          const badge = e.status === 'active' ? `<span class="badge badge-green">✅ 활성</span>` : `<span class="badge badge-amber">⏸ 미사용</span>`;
+          const toggleLabel = e.status === 'suspended' ? '✅ 활성화' : '⏸ 미사용';
+          return `<tr>
+        <td style="text-align:center;"><input type="checkbox" class="emp-checkbox" value="${e.id}" style="margin-right:4px;"> ${idx + 1}</td>
+        <td class="fw-600">${esc(e.name)}</td>
+        <td class="td-muted">${esc(e.department) || '-'}</td>
+        <td class="td-muted">${esc(e.team) || '-'}</td>
+        <td>${badge}</td>
+        <td class="td-muted">${fmtDate(e.created_at)}</td>
+        <td><div class="td-actions">
+          <button class="btn btn-sm" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;" onclick="toggleUserStatus('${e.id}','${esc(e.name)}','${e.status}')">${toggleLabel}</button>
+          <button class="btn btn-sm" style="background:rgba(99,102,241,.15);border:1px solid #6366f1;color:#6366f1;" onclick="resetUserPw('${e.id}','${esc(e.name)}')">🔑 초기화</button>
+          
+        </div></td>
+      </tr>`;
+        }).join('');
+      } catch (e) { toast('직원 목록 로딩 실패: ' + e.message, 'error'); }
+    }
+
+    async function toggleUserStatus(uid, name, currentStatus) {
+      const label = currentStatus === 'suspended' ? '활성화' : '미사용';
+      confirm2(`계정 ${label}`, `"${name}" 계정을 ${label} 처리하시겠습니까?`, async () => {
+        try {
+          const data = await api(`/api/auth/toggle-status/${uid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success'); loadEmployeeList();
+        } catch (e) { toast(e.message, 'error'); }
+      }, label + ' 확인', 'btn-secondary');
+    }
+
+    async function resetUserPw(uid, name) {
+      confirm2('비밀번호 초기화', `"${name}"의 비밀번호를 0000으로 초기화하시겠습니까?`, async () => {
+        try {
+          const data = await api(`/api/auth/reset-password/${uid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success');
+        } catch (e) { toast(e.message, 'error'); }
+      }, '🔑 초기화 확인', 'btn-danger');
+    }
+
+    async function deleteEmployee(uid, name) {
+      confirm2('계정 삭제', `"${name}" 계정을 삭제하시겠습니까?\n(휴지통에서 복구할 수 있습니다.)`, async () => {
+        try {
+          const data = await api(`/api/auth/delete/${uid}`, { method: 'DELETE', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success'); loadEmployeeList();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '🗑️ 삭제 확인', 'btn-danger');
+    }
+
+    async function loadTrashList() {
+      try {
+        const data = await api(`/api/auth/trash?userId=${currentUser?.id || ''}`);
+        const list = data.deleted || [];
+        const tbody = document.getElementById('trash-tbody');
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🗑️</div><p>삭제된 계정이 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = list.map(e => `<tr>
+      <td class="fw-600">${esc(e.name)}</td>
+      <td class="td-muted">${esc(e.department) || '-'}</td>
+      <td class="td-muted">${esc(e.team) || '-'}</td>
+      <td class="td-muted">${fmtDate(e.deleted_at)}</td>
+      <td><button class="btn btn-sm" style="background:rgba(16,185,129,.2);border:1px solid #10b981;color:#10b981;" onclick="restoreEmployee('${e.id}','${esc(e.name)}')">♻️ 복구</button></td>
+    </tr>`).join('');
+      } catch (e) { toast('휴지통 로딩 실패: ' + e.message, 'error'); }
+    }
+
+    async function restoreEmployee(uid, name) {
+      confirm2('계정 복구', `"${name}" 계정을 복구하시겠습니까?`, async () => {
+        try {
+          const data = await api(`/api/auth/restore/${uid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
+          toast(data.message, 'success'); loadTrashList();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '♻️ 복구 확인', 'btn-primary');
+    }
+
+    // ── Dashboard ─────────────────────────────────────────────
+    async function loadDashboard() {
+      try {
+        const [statsData, noticesData, projData] = await Promise.all([
+          api(`/api/stats?userId=${currentUser?.id || ''}`).catch(() => ({})),
+          api('/api/notices').catch(() => ({})),
+          api('/api/project-info').catch(() => ({}))
+        ]);
+        if (projData.project) {
+          document.getElementById('proj-name-label').textContent = projData.project.project_name || '공사명 미등록';
+        }
+        const s = statsData.stats || {};
+        document.getElementById('stat-docs').textContent = s.total_documents ?? '-';
+        document.getElementById('stat-workers').textContent = s.total_workers ?? '-';
+        document.getElementById('stat-tbm').textContent = s.total_tbm ?? '-';
+        document.getElementById('stat-workplans').textContent = s.total_workplans ?? '-';
+        
+        const notices = (noticesData.notices || []).slice(0, 10);
+        const tbody = document.getElementById('dash-notice-tbody');
+        if (!notices.length) { tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>최근 등록된 글이 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = notices.map(n => `<tr>
+      <td class="fw-600">${esc(n.title)}</td>
+      <td class="td-muted">${fmtAuthor(n.author_name)}</td>
+      <td class="td-muted" style="white-space:nowrap;">${fmtDate(n.created_at)}</td>
+      <td>${n.file_name ? `<a href="/uploads/${encodeURIComponent(n.file_path)}" target="_blank" style="color:var(--accent);font-size:13px;">📎 다운로드</a>` : '-'}</td>
+    </tr>`).join('');
+      } catch (e) { }
+    }
+
+    // ── Project Info ──────────────────────────────────────────
+    let projectDataList = [];
+    let editingProjectId = null;
+
+    async function loadProjectDropdowns() {
+      try {
+        const viewAs = document.getElementById('view-as-employee')?.value || '';
+        const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
+        const projects = data.projects || [];
+        const options = '<option value="all">전체 현장</option>' + projects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+        ['filter-workers-project', 'filter-workplan-project', 'filter-tbm-project'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = options;
+        });
+      } catch (e) { console.error('Project dropdown load failed', e); }
+    }
+    
+    async function loadProjectInfo() {
+      try {
+        const viewAs = document.getElementById('view-as-employee')?.value || '';
+        const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
+        projectDataList = data.projects || [];
+        const container = document.getElementById('proj-view');
+        const isAdmin = currentUser?.role === 'admin';
+
+        if (!projectDataList.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 공사 정보가 없습니다.</p></div>'; return; }
+        
+        container.innerHTML = projectDataList.map(p => {
+          const canEdit = isAdmin || p.updated_by === currentUser?.name;
+          return `
+          <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);">
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+              <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
+              ${canEdit ? `<div>
+                <button class="btn btn-secondary btn-sm" onclick="editProject('${p.id}')">✏️ 수정</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
+              </div>` : ''}
+            </div>
+            <div class="grid-2" style="gap:16px;">
+              <div><label style="color:var(--text-muted);font-size:12px;">업체명 / 발주처</label><p style="margin-top:4px;font-size:14px;font-weight:600;">${esc(p.contractor_name || p.client_name || '-')}</p></div>
+              <div><label style="color:var(--text-muted);font-size:12px;">공사 기간</label><p style="margin-top:4px;font-size:13px;">${esc(p.start_date)} ~ ${esc(p.end_date)}</p></div>
+              <div><label style="color:var(--text-muted);font-size:12px;">공사 금액</label><p style="margin-top:4px;font-size:13px;">${esc(p.contract_amount)}</p></div>
+              <div><label style="color:var(--text-muted);font-size:12px;">공사담당자</label><p style="margin-top:4px;font-size:13px;">${esc(p.site_manager)}</p></div>
+              <div style="grid-column:1/-1;"><label style="color:var(--text-muted);font-size:12px;">현장 주소</label><p style="margin-top:4px;font-size:13px;">${esc(p.location || p.site_address)}</p></div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (e) { toast('공사정보 로딩 실패: ' + e.message, 'error'); }
+    }
+
+    // ── Workers ───────────────────────────────────────────────
+    async function loadWorkers() {
+      try {
+        const viewAs = document.getElementById('view-as-employee')?.value || '';
+        const projId = document.getElementById('filter-workers-project')?.value || 'all';
+        const url = viewAs ? `/api/workers?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}` : `/api/workers?userId=${currentUser?.id || ''}&projectId=${projId}`;
+        const data = await api(url);
+        const list = data.workers || [];
+        const tbody = document.getElementById('workers-tbody');
+        const canEdit = currentUser?.role === 'admin';
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👷</div><p>등록된 근로자가 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = list.map(w => `<tr>
+      <td class="fw-600">${esc(w.name)}</td>
+      <td class="td-muted">${esc(w.job_type) || '-'}</td>
+      <td class="td-muted">${esc(w.nationality) || '-'}</td>
+      <td class="td-muted">${esc(w.hire_date) || '-'}</td>
+      <td>${canEdit ? `<div class="td-actions"><button class="btn btn-secondary btn-sm" onclick="openWorkerModal('${w.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="delWorker('${w.id}','${esc(w.name)}')">🗑️</button></div>` : '-'}</td>
+    </tr>`).join('');
+      } catch (e) { toast('근로자 로딩 실패: ' + e.message, 'error'); }
+    }
+    function openWorkerModal(id) {
+      editingWorkerId = id;
+      document.getElementById('worker-modal-title').textContent = id ? '근로자 수정' : '근로자 추가';
+      ['w-name', 'w-job', 'w-nation', 'w-hire', 'w-note'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+      if (id) {
+        api(`/api/workers/${id}?userId=${currentUser?.id}`).then(data => {
+          const w = data.worker;
+          document.getElementById('w-name').value = w.name || '';
+          document.getElementById('w-job').value = w.job_type || '';
+          document.getElementById('w-nation').value = w.nationality || '';
+          document.getElementById('w-hire').value = w.hire_date || '';
+          document.getElementById('w-note').value = w.notes || '';
+        }).catch(e => toast(e.message, 'error'));
+      }
+      openModal('modal-worker');
+    }
+    async function saveWorker() {
+      const body = {
+        userId: currentUser?.id,
+        name: document.getElementById('w-name').value.trim(),
+        job_type: document.getElementById('w-job').value.trim(),
+        nationality: document.getElementById('w-nation').value.trim(),
+        hire_date: document.getElementById('w-hire').value,
+        notes: document.getElementById('w-note').value.trim(),
+      };
+      if (!body.name) { toast('이름을 입력하세요.', 'error'); return; }
+      try {
+        const method = editingWorkerId ? 'PUT' : 'POST';
+        const url = editingWorkerId ? `/api/workers/${editingWorkerId}` : '/api/workers';
+        await api(url, { method, body: JSON.stringify(body) });
+        toast(editingWorkerId ? '수정되었습니다.' : '등록되었습니다.', 'success');
+        closeModal('modal-worker'); loadWorkers();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function delWorker(id, name) {
+      confirm2('근로자 삭제', `"${name}" 근로자 정보를 삭제하시겠습니까?`, async () => {
+        try {
+          await api(`/api/workers/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) });
+          toast('삭제되었습니다.', 'success'); loadWorkers();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '🗑️ 삭제 확인', 'btn-danger');
+    }
+
+    // ── TBM ───────────────────────────────────────────────────
+    async function loadTbmList() {
+      try {
+        const viewAs = document.getElementById('view-as-employee')?.value || '';
+        const projId = document.getElementById('filter-tbm-project')?.value || 'all';
+        const data = await api(`/api/tbm?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}`);
+        const list = data.tbm_logs || [];
+        const tbody = document.getElementById('tbm-tbody');
+        const canEdit = currentUser?.role === 'admin';
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📢</div><p>TBM 기록이 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = list.map(t => {
+          const imgs = (t.image_path || '').split(',').filter(x => x.trim());
+          return `<tr>
+      <td class="fw-600" style="white-space:nowrap;">${esc(t.created_date)}
+        <div style="font-size:11px;color:var(--text-muted);font-weight:normal;">작성: ${fmtDate(t.created_at)}</div>
+      </td>
+      <td style="max-width:300px;white-space:pre-wrap;">${esc((t.work_details_hazards || '').slice(0, 80))}${(t.work_details_hazards || '').length > 80 ? '...' : ''}</td>
+      <td style="max-width:200px;">${esc((t.safety_measures || '').slice(0, 60))}${(t.safety_measures || '').length > 60 ? '...' : ''}</td>
+      <td class="td-muted">${fmtAuthor(t.creator_name)}</td>
+      <td>
+        ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
+          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
+            <img src="/uploads/${encodeURIComponent(img.trim())}" alt="TBM 사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
+            <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
+          </div>`).join('') + `</div>` : ''}
+        <div class="td-actions" style="display:inline-flex;"><button class="btn btn-secondary btn-sm" onclick="openTbmModal('${t.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="delTbm('${t.id}')">🗑️</button></div>
+      </td>
+    </tr>`;
+        }).join('');
+      } catch (e) { toast('TBM 로딩 실패: ' + e.message, 'error'); }
+    }
+    function openTbmModal(id) {
+      editingTbmId = id;
+      document.getElementById('tbm-modal-title').textContent = id ? 'TBM 수정' : 'TBM 작성';
+      ['tbm-date', 'tbm-hazards', 'tbm-measures', 'tbm-notes'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('tbm-date').value = new Date().toISOString().slice(0, 10);
+      if (id) {
+        api(`/api/tbm/${id}?userId=${currentUser?.id}`).then(data => {
+          const t = data.tbm_log;
+          document.getElementById('tbm-date').value = t.created_date || '';
+          document.getElementById('tbm-hazards').value = t.work_details_hazards || '';
+          document.getElementById('tbm-measures').value = t.safety_measures || '';
+          document.getElementById('tbm-notes').value = t.special_notes || '';
+        }).catch(e => toast(e.message, 'error'));
+      }
+      openModal('modal-tbm');
+    }
+    async function saveTbm() {
+      const date = document.getElementById('tbm-date').value;
+      const hazards = document.getElementById('tbm-hazards').value.trim();
+      const measures = document.getElementById('tbm-measures').value.trim();
+      const notes = document.getElementById('tbm-notes').value.trim();
+      if (!hazards || !measures) { toast('필수 항목을 입력하세요.', 'error'); return; }
+      try {
+        const fd = new FormData();
+        fd.append('userId', currentUser?.id || '');
+        fd.append('created_date', date);
+        fd.append('work_details_hazards', hazards);
+        fd.append('safety_measures', measures);
+        fd.append('special_notes', notes);
+        fd.append('creator_name', currentUser?.name || '');
+        
+        const photoInput = document.getElementById('tbm-photo');
+        if (photoInput && photoInput.files) {
+          for (let i = 0; i < photoInput.files.length; i++) {
+            fd.append('files', photoInput.files[i]);
+          }
+        }
+
+        const method = editingTbmId ? 'PUT' : 'POST';
+        const url = editingTbmId ? `/api/tbm/${editingTbmId}` : '/api/tbm';
+        
+        // Use standard fetch for FormData
+        const res = await fetch(url, { method, body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '저장 실패');
+
+        toast(editingTbmId ? '수정되었습니다.' : '작성되었습니다.', 'success');
+        closeModal('modal-tbm'); loadTbmList();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function delTbm(id) {
+      confirm2('TBM 삭제', 'TBM 일지를 삭제하시겠습니까?', async () => {
+        try { await api(`/api/tbm/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadTbmList(); } catch (e) { toast(e.message, 'error'); }
+      }, '삭제 확인', 'btn-danger');
+    }
+
+    // ── Work Plans ────────────────────────────────────────────
+    async function loadWorkplans() {
+      try {
+        const viewAs = document.getElementById('view-as-employee')?.value || '';
+        const projId = document.getElementById('filter-workplan-project')?.value || 'all';
+        const data = await api(`/api/workplans?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}`);
+        const list = data.work_plans || [];
+        const tbody = document.getElementById('wp-tbody');
+        const canEdit = currentUser?.role === 'admin';
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><p>작업계획서가 없습니다.</p></div></td></tr>`; return; }
+        const statusLabel = { planned: '<span class="badge badge-blue">계획</span>', in_progress: '<span class="badge badge-amber">진행중</span>', completed: '<span class="badge badge-green">완료</span>' };
+        tbody.innerHTML = list.map(w => {
+          const imgs = (w.image_path || '').split(',').filter(x => x.trim());
+          return `<tr>
+      <td class="fw-600" style="white-space:nowrap;">${esc(w.work_date)}
+        <div style="font-size:11px;color:var(--text-muted);font-weight:normal;">작성: ${fmtDate(w.created_at)}</div>
+      </td>
+      <td>${esc((w.work_content || '').slice(0, 80))}</td>
+      <td class="td-muted">${fmtAuthor(w.manager_name)}</td>
+      <td>${statusLabel[w.status] || w.status}</td>
+      <td>
+        ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
+          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
+            <img src="/uploads/${encodeURIComponent(img.trim())}" alt="작업 사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
+            <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
+          </div>`).join('') + `</div>` : ''}
+        <div class="td-actions" style="display:inline-flex;"><button class="btn btn-secondary btn-sm" onclick="openWpModal('${w.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="delWp('${w.id}')">🗑️</button></div>
+      </td>
+    </tr>`;
+        }).join('');
+      } catch (e) { toast('작업계획서 로딩 실패: ' + e.message, 'error'); }
+    }
+    function openWpModal(id) {
+      editingWpId = id;
+      document.getElementById('wp-modal-title').textContent = id ? '작업계획서 수정' : '작업계획서 작성';
+      ['wp-date', 'wp-content', 'wp-manager'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('wp-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('wp-status').value = 'planned';
+      if (id) {
+        api(`/api/workplans/${id}?userId=${currentUser?.id}`).then(data => {
+          const w = data.work_plan;
+          document.getElementById('wp-date').value = w.work_date || '';
+          document.getElementById('wp-content').value = w.work_content || '';
+          document.getElementById('wp-manager').value = w.manager_name || '';
+          document.getElementById('wp-status').value = w.status || 'planned';
+        }).catch(e => toast(e.message, 'error'));
+      }
+      openModal('modal-wp');
+    }
+    async function saveWorkplan() {
+      const date = document.getElementById('wp-date').value;
+      const content = document.getElementById('wp-content').value.trim();
+      const manager = document.getElementById('wp-manager').value.trim();
+      const status = document.getElementById('wp-status').value;
+      
+      if (!content) { toast('작업 내용을 입력하세요.', 'error'); return; }
+      try {
+        const fd = new FormData();
+        fd.append('userId', currentUser?.id || '');
+        fd.append('work_date', date);
+        fd.append('work_content', content);
+        fd.append('manager_name', manager);
+        fd.append('status', status);
+
+        const photoInput = document.getElementById('wp-photo');
+        if (photoInput && photoInput.files) {
+          for (let i = 0; i < photoInput.files.length; i++) {
+            fd.append('files', photoInput.files[i]);
+          }
+        }
+
+        const method = editingWpId ? 'PUT' : 'POST';
+        const url = editingWpId ? `/api/workplans/${editingWpId}` : '/api/workplans';
+        
+        const res = await fetch(url, { method, body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '저장 실패');
+
+        toast(editingWpId ? '수정되었습니다.' : '작성되었습니다.', 'success');
+        closeModal('modal-wp'); loadWorkplans();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function delWp(id) {
+      confirm2('작업계획서 삭제', '작업계획서를 삭제하시겠습니까?', async () => {
+        try { await api(`/api/workplans/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadWorkplans(); } catch (e) { toast(e.message, 'error'); }
+      }, '삭제 확인', 'btn-danger');
+    }
+
+    // ── Notice ──────────────────────────────────────────
+    async function loadNotices() {
+      try {
+        const data = await api('/api/notices');
+        const list = data.notices || [];
+        const container = document.getElementById('notice-list');
+        const isAdmin = currentUser?.role === 'admin';
+        const addBtn = document.getElementById('add-notice-btn');
+        if (addBtn) addBtn.style.display = isAdmin ? '' : 'none';
+        if (!list.length) {
+          container.innerHTML = `<div class="empty-state"><div class="empty-icon">📣</div><p>등록된 공지가 없습니다.</p></div>`;
+          return;
+        }
+        container.innerHTML = list.map(n => `
+          <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:8px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-weight:700;font-size:15px;">${esc(n.title)}</span>
+              <span style="font-size:12px;color:var(--text-muted);">${fmtDate(n.created_at)} &nbsp;·&nbsp; ${fmtAuthor(n.author_name)}</span>
+            </div>
+            ${n.content ? `<p style="color:var(--text-secondary);font-size:13px;white-space:pre-wrap;margin-bottom:8px;">${esc(n.content)}</p>` : ''}
+            ${n.file_name ? `<a href="/uploads/${encodeURIComponent(n.file_path)}" target="_blank" style="color:var(--accent);font-size:13px;">&#128206; ${esc(n.file_name)}</a>` : ''}
+            ${isAdmin ? `<div style="text-align:right;margin-top:8px;"><button class="btn btn-danger btn-sm" onclick="deleteNotice('${n.id}')">&#128465; 삭제</button></div>` : ''}
+          </div>`).join('');
+      } catch (e) { toast('공지 로드 실패: ' + e.message, 'error'); }
+    }
+    function openNoticeModal() { openModal('modal-notice'); ['notice-title','notice-content'].forEach(id => document.getElementById(id).value=''); document.getElementById('notice-file').value=''; }
+    async function saveNotice() {
+      const title = document.getElementById('notice-title').value.trim();
+      if (!title) { toast('제목을 입력하세요.', 'error'); return; }
+      try {
+        const fd = new FormData();
+        fd.append('userId', currentUser?.id || '');
+        fd.append('title', title);
+        fd.append('content', document.getElementById('notice-content').value.trim());
+        const fileInput = document.getElementById('notice-file');
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          fd.append('file', fileInput.files[0]);
+        }
+        const res = await fetch('/api/notices', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '등록 실패');
+        toast('공지가 등록되었습니다.', 'success');
+        closeModal('modal-notice'); loadNotices();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function deleteNotice(id) {
+      confirm2('공지 삭제', '이 공지를 삭제하시겠습니까?', async () => {
+        try { await api(`/api/notices/${id}?userId=${currentUser?.id}`, { method: 'DELETE' }); toast('삭제됨', 'success'); loadNotices(); } catch (e) { toast(e.message, 'error'); }
+      }, '삭제 확인', 'btn-danger');
+    }
+
+    // ── 새 공사 추가 / 수정 ────────────────────────────────────
+    function openAddProjectModal() { 
+      editingProjectId = null;
+      document.getElementById('project-modal-title').textContent = '🏗️ 새 공사 추가';
+      ['np-name','np-contractor','np-start','np-end','np-amount','np-manager','np-location'].forEach(id => document.getElementById(id).value=''); 
+      openModal('modal-add-project');
+    }
+    function editProject(id) {
+      editingProjectId = id;
+      const p = projectDataList.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('project-modal-title').textContent = '🏗️ 공사 수정';
+      document.getElementById('np-name').value = p.project_name || '';
+      document.getElementById('np-contractor').value = p.contractor_name || p.client_name || '';
+      document.getElementById('np-start').value = p.start_date || '';
+      document.getElementById('np-end').value = p.end_date || '';
+      document.getElementById('np-amount').value = p.contract_amount || '';
+      document.getElementById('np-manager').value = p.site_manager || '';
+      document.getElementById('np-location').value = p.location || p.site_address || '';
+      openModal('modal-add-project');
+    }
+    async function saveNewProject() {
+      const name = document.getElementById('np-name').value.trim();
+      const contractor = document.getElementById('np-contractor').value.trim();
+      const start = document.getElementById('np-start').value.trim();
+      const end = document.getElementById('np-end').value.trim();
+      const amount = document.getElementById('np-amount').value.trim();
+      const manager = document.getElementById('np-manager').value.trim();
+      const location = document.getElementById('np-location').value.trim();
+      if (!name || !contractor || !start || !end || !amount || !manager || !location) {
+        toast('필수 항목을 모두 입력하세요.', 'error'); return;
+      }
+      try {
+        const method = editingProjectId ? 'PUT' : 'POST';
+        const url = editingProjectId ? `/api/projects/${editingProjectId}` : '/api/projects';
+        await api(url, { method, body: JSON.stringify({
+          userId: currentUser?.id,
+          project_name: name, contractor_name: contractor,
+          start_date: start, end_date: end,
+          contract_amount: amount, site_manager: manager, location
+        }) });
+        toast(editingProjectId ? '공사가 수정되었습니다.' : '공사가 추가되었습니다.', 'success');
+        closeModal('modal-add-project'); loadProjectInfo();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function deleteProject(id) {
+      confirm2('공사 삭제', '정말 삭제하시겠습니까?', async () => {
+        try { await api(`/api/projects/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadProjectInfo(); } catch (e) { toast(e.message, 'error'); }
+      }, '삭제 확인', 'btn-danger');
+    }
+
+    // ── Docs ──────────────────────────────────────────────────
+    async function loadDocs() {
+      try {
+        const data = await api(`/api/documents?userId=${currentUser?.id || ''}`);
+        allDocs = data.documents || [];
+        renderDocs(allDocs);
+      } catch (e) { toast('문서 로딩 실패: ' + e.message, 'error'); }
+    }
+    function filterDocs() {
+      const q = document.getElementById('doc-search').value.toLowerCase();
+      const cat = document.getElementById('doc-cat-filter').value;
+      renderDocs(allDocs.filter(d => (!q || d.title.toLowerCase().includes(q) || (d.description || '').toLowerCase().includes(q)) && (!cat || d.category === cat)));
+    }
+    function renderDocs(list) {
+      const tbody = document.getElementById('docs-tbody');
+      const canEdit = currentUser?.role === 'admin';
+      if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📁</div><p>문서가 없습니다.</p></div></td></tr>`; return; }
+      tbody.innerHTML = list.map(d => `<tr>
+    <td><a href="/uploads/${esc(d.file_path)}" target="_blank" style="color:var(--accent);text-decoration:none;">📄 ${esc(d.title)}</a></td>
+    <td><span class="badge badge-blue">${esc(d.category) || '-'}</span></td>
+    <td class="td-muted">${fmtAuthor(d.uploader_name)}</td>
+    <td class="td-muted" style="white-space:nowrap;">${fmtDate(d.created_at)}</td>
+    <td>${canEdit ? `<button class="btn btn-danger btn-sm" onclick="delDoc('${d.id}','${esc(d.title)}')">🗑️</button>` : '-'}</td>
+  </tr>`).join('');
+      if (!canEdit) document.getElementById('upload-doc-btn').style.display = 'none';
+    }
+    function openUploadModal() { openModal('modal-upload'); }
+    async function uploadDoc() {
+      const file = document.getElementById('up-file').files[0];
+      const title = document.getElementById('up-title').value.trim();
+      if (!file || !title) { toast('문서명과 파일을 선택하세요.', 'error'); return; }
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('title', title);
+      fd.append('category', document.getElementById('up-cat').value);
+      fd.append('description', document.getElementById('up-desc').value);
+      fd.append('userId', currentUser?.id || '');
+      try {
+        const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        toast('업로드 완료', 'success'); closeModal('modal-upload'); loadDocs();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function delDoc(id, title) {
+      confirm2('문서 삭제', `"${title}" 문서를 삭제하시겠습니까?`, async () => {
+        try { await api(`/api/documents/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadDocs(); } catch (e) { toast(e.message, 'error'); }
+      }, '삭제 확인', 'btn-danger');
+    }
+
+    // ── Audit Log ─────────────────────────────────────────────
+    async function loadAuditLog() {
+      try {
+        const data = await api(`/api/audit-logs?userId=${currentUser?.id || ''}`);
+        const list = data.logs || [];
+        const tbody = document.getElementById('audit-tbody');
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><p>로그 없음</p></div></td></tr>`; return; }
+        tbody.innerHTML = list.map(l => `<tr>
+      <td class="td-muted" style="white-space:nowrap;">${fmtDate(l.timestamp)}</td>
+      <td class="fw-600">${fmtAuthor(l.user_name)}</td>
+      <td><span class="badge badge-gray">${esc(l.user_role)}</span></td>
+      <td><span class="badge badge-blue">${esc(l.action)}</span></td>
+      <td class="td-muted">${esc(l.details)}</td>
+    </tr>`).join('');
+      } catch (e) { }
+    }
+
+    // ── 날짜 자동 포맷 (YYYYMMDD → YYYY-MM-DD) ──────────────────
+    function autoFormatDate(input) {
+      let v = input.value.replace(/[^0-9]/g, '');
+      if (v.length >= 8) {
+        v = v.slice(0, 8);
+        input.value = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+      } else if (v.length > 4) {
+        input.value = `${v.slice(0, 4)}-${v.slice(4)}`;
+      } else {
+        input.value = v;
+      }
+    }
+
+    // ── 금액 자동 콤마 ───────────────────────────────────────────
+    function autoFormatAmount(input) {
+      let v = input.value.replace(/[^0-9]/g, '');
+      if (v) input.value = parseInt(v, 10).toLocaleString('ko-KR');
+      else input.value = '';
+    }
+
+    // ── 관리자: 직원별 보기 필터 ─────────────────────────────────
+    async function loadEmployeeFilter() {
+      try {
+        const data = await api(`/api/auth/employees?userId=${currentUser?.id || ''}`);
+        const sel = document.getElementById('view-as-employee');
+        sel.innerHTML = '<option value="">\uc804\uccb4 \ubcf4\uae30</option>';
+        (data.employees || []).filter(e => e.status === 'active').forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = `${e.name} (${e.department || '-'})`;
+          sel.appendChild(opt);
+        });
+      } catch (e) { }
+    }
+    function onViewAsChange() {
+      const page = document.querySelector('.page.active')?.id?.replace('page-', '');
+      if (page) {
+        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, docs: loadDocs };
+        if (loaders[page]) loaders[page]();
+      }
+    }
+
+    // ── Enter key login ───────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const ap = document.getElementById('panel-admin');
+        const ep = document.getElementById('panel-empl');
+        if (ap && ap.classList.contains('active')) doLogin('admin');
+        else if (ep && ep.classList.contains('active')) doLogin('employee');
+      }
+    });
+  </script>
+</body>
+
+</html>
