@@ -354,6 +354,90 @@ def register_request():
         db.close()
 
 
+
+@app.route('/api/auth/deleted-employees', methods=['GET'])
+def get_deleted_employees():
+    user_id = request.args.get('userId')
+    admin = get_user(user_id)
+    if not admin or admin.get('role') != 'admin':
+        return jsonify({'error': '권한이 없습니다.'}), 403
+    db = get_db()
+    try:
+        employees = rows_to_list(db.execute(
+            "SELECT id, name, department, team, status, created_at FROM users WHERE role='employee' AND status='deleted' ORDER BY created_at DESC"
+        ).fetchall())
+        return jsonify({'success': True, 'employees': employees})
+    finally:
+        db.close()
+
+@app.route('/api/auth/hard-delete-accounts', methods=['POST'])
+def hard_delete_accounts():
+    data = request.get_json() or {}
+    user_id = data.get('userId')
+    account_ids = data.get('accountIds', [])
+    admin = get_user(user_id)
+    if not admin or admin['role'] != 'admin':
+        return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
+    if not account_ids:
+        return jsonify({'error': '삭제할 계정이 없습니다.'}), 400
+        
+    db = get_db()
+    try:
+        placeholders = ','.join('?' * len(account_ids))
+        # Ensure we only delete accounts that are already in 'deleted' status to be safe
+        db.execute(f"DELETE FROM users WHERE id IN ({placeholders}) AND status='deleted'", account_ids)
+        db.commit()
+        
+        add_audit_log(admin['id'], admin['name'], admin['role'], 'DELETE',
+                      f"계정 {len(account_ids)}건 영구 삭제", 'bulk', '')
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+@app.route('/api/auth/delete-accounts', methods=['POST'])
+def delete_accounts():
+    data = request.get_json() or {}
+    user_id = data.get('userId')
+    account_ids = data.get('accountIds', [])
+    admin = get_user(user_id)
+    if not admin or admin.get('role') != 'admin':
+        return jsonify({'error': '권한이 없습니다.'}), 403
+    
+    if not account_ids:
+        return jsonify({'error': '선택된 계정이 없습니다.'}), 400
+        
+    db = get_db()
+    try:
+        placeholders = ','.join('?' * len(account_ids))
+        query = f"UPDATE users SET status='deleted' WHERE id IN ({placeholders})"
+        db.execute(query, account_ids)
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+@app.route('/api/auth/restore-accounts', methods=['POST'])
+def restore_accounts():
+    data = request.get_json() or {}
+    user_id = data.get('userId')
+    account_ids = data.get('accountIds', [])
+    admin = get_user(user_id)
+    if not admin or admin.get('role') != 'admin':
+        return jsonify({'error': '권한이 없습니다.'}), 403
+    
+    if not account_ids:
+        return jsonify({'error': '선택된 계정이 없습니다.'}), 400
+        
+    db = get_db()
+    try:
+        placeholders = ','.join('?' * len(account_ids))
+        query = f"UPDATE users SET status='active' WHERE id IN ({placeholders})"
+        db.execute(query, account_ids)
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
 @app.route('/api/auth/pending', methods=['GET'])
 def get_pending_users():
     """관리자용: 대기 중인 계정 신청 목록"""
@@ -524,7 +608,7 @@ def get_employees():
     db = get_db()
     try:
         employees = rows_to_list(db.execute(
-            "SELECT id, name, department, team, status, created_at FROM users WHERE role='employee' ORDER BY created_at DESC"
+            "SELECT id, name, department, team, status, created_at FROM users WHERE role='employee' AND status='active' ORDER BY created_at DESC"
         ).fetchall())
         # 각 직원의 배정 현장 목록 추가
         for emp in employees:
@@ -1500,6 +1584,49 @@ def update_document(doc_id):
     finally:
         db.close()
 
+
+@app.route('/api/documents/delete-multiple', methods=['DELETE'])
+def delete_multiple_documents():
+    data = request.get_json() or {}
+    user_id = data.get('userId')
+    doc_ids = data.get('docIds', [])
+    user = get_user(user_id)
+    
+    if not doc_ids:
+        return jsonify({'error': '선택된 문서가 없습니다.'}), 400
+        
+    db = get_db()
+    try:
+        placeholders = ','.join('?' * len(doc_ids))
+        
+        # 권한 확인
+        if user and user['role'] != 'admin':
+            rows = db.execute(f"SELECT uploader_id FROM documents WHERE id IN ({placeholders})", doc_ids).fetchall()
+            for row in rows:
+                if row['uploader_id'] != user['id']:
+                    return jsonify({'error': '삭제 권한이 없는 문서가 포함되어 있습니다.'}), 403
+                    
+        # 파일 삭제 처리 로직 (로컬 파일 시스템에서도 삭제하려면 구현)
+        rows = db.execute(f"SELECT file_path FROM documents WHERE id IN ({placeholders})", doc_ids).fetchall()
+        for row in rows:
+            if row['file_path']:
+                full_path = os.path.join(app.config['UPLOAD_FOLDER'], row['file_path'])
+                if os.path.exists(full_path):
+                    try:
+                        os.remove(full_path)
+                    except:
+                        pass
+        
+        db.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        db.commit()
+        
+        if user:
+            add_audit_log(user['id'], user['name'], user['role'], 'DELETE',
+                          f"문서 {len(doc_ids)}건 일괄 삭제", 'bulk', '')
+                          
+        return jsonify({'success': True})
+    finally:
+        db.close()
 
 @app.route('/api/documents/<doc_id>', methods=['DELETE'])
 def delete_document(doc_id):
