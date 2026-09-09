@@ -1,0 +1,48 @@
+842: <div class="sidebar-item" onclick="navigateTo('project')" id="nav-project">🏗️ 공사정보 관리</div>
+936: <div class="page" id="page-project">
+937: <div class="section-title">🏗️ 공사정보 관리</div>
+977: <select id="filter-workers-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadWorkers()">
+1016: <select id="filter-workplan-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadWorkplans()">
+1055: <select id="filter-tbm-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadTbmList()">
+1097: <option>공사정보</option>
+1100: <option>위험성평가</option>
+1405: <div class="modal-overlay" id="modal-add-project">
+1408: <div class="modal-title" id="project-modal-title">🏗️ 새 공사 추가</div>
+1409: <button class="modal-close" onclick="closeModal('modal-add-project')">✕</button>
+1422: <div class="form-group"><label>공사금액 <span style="color:#f85149">*</span></label>
+1431: <button class="btn btn-secondary" onclick="closeModal('modal-add-project')">취소</button>
+1447: <option>공사정보</option>
+1450: <option>위험성평가</option>
+1559: const titles = { dashboard: '대시보드', project: '공사정보 관리', workers: '근로자 이력정보', workplan: '작업계획서', tbm: 'TBM 일지', docs: '문서 관리', auditlog: '감사 로그', accounts: '계정 관리', notice: '공지' };
+1564: const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+1812: api('/api/project-info').catch(() => ({}))
+1814: if (projData.project) {
+1815: document.getElementById('proj-name-label').textContent = projData.project.project_name || '공사명 미등록';
+1836: let projectDataList = [];
+1842: const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
+1843: const projects = data.projects || [];
+1844: const options = '<option value="all">전체 현장</option>' + projects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+1845: ['filter-workers-project', 'filter-workplan-project', 'filter-tbm-project'].forEach(id => {
+1855: const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
+1856: projectDataList = data.projects || [];
+1860: if (!projectDataList.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 공사 정보가 없습니다.</p></div>'; return; }
+1862: container.innerHTML = projectDataList.map(p => {
+1867: <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
+1882: } catch (e) { toast('공사정보 로딩 실패: ' + e.message, 'error'); }
+1889: const projId = document.getElementById('filter-workers-project')?.value || 'all';
+1890: const url = viewAs ? `/api/workers?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}` : `/api/workers?userId=${currentUser?.id || ''}&projectId=${projId}`;
+1952: const projId = document.getElementById('filter-tbm-project')?.value || 'all';
+1953: const data = await api(`/api/tbm?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}`);
+2039: const projId = document.getElementById('filter-workplan-project')?.value || 'all';
+2040: const data = await api(`/api/workplans?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}`);
+2177: document.getElementById('project-modal-title').textContent = '🏗️ 새 공사 추가';
+2179: openModal('modal-add-project');
+2183: const p = projectDataList.find(x => x.id === id);
+2185: document.getElementById('project-modal-title').textContent = '🏗️ 공사 수정';
+2186: document.getElementById('np-name').value = p.project_name || '';
+2193: openModal('modal-add-project');
+2208: const url = editingProjectId ? `/api/projects/${editingProjectId}` : '/api/projects';
+2211: project_name: name, contractor_name: contractor,
+2216: closeModal('modal-add-project'); loadProjectInfo();
+2221: try { await api(`/api/projects/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadProjectInfo(); } catch (e) { toast(e.message, 'error'); }
+2329: const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, docs: loadDocs };

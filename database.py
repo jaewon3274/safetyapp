@@ -69,6 +69,20 @@ def _migrate(conn):
     if 'password_hash' not in p_cols:
         c.execute("ALTER TABLE pending_users ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''")
 
+    # ── 데이터 복구: status 컬럼에 비밀번호 해시가 들어간 잘못된 레코드 수정 ──
+    # 이전 마이그레이션에서 password_hash 컬럼이 없었을 때 INSERT된 데이터가
+    # 컬럼 shift 되어 status에 scrypt 해시값이 저장된 버그를 자동 복구합니다.
+    bad_rows = c.execute(
+        "SELECT id, status FROM pending_users WHERE status LIKE 'scrypt:%' OR (status != 'pending' AND status != 'approved' AND status != 'rejected')"
+    ).fetchall()
+    for row in bad_rows:
+        # status에 들어간 해시를 password_hash로 이동하고 status를 'pending'으로 복구
+        c.execute(
+            "UPDATE pending_users SET password_hash=status, status='pending' WHERE id=?",
+            (row[0],)
+        )
+
+
     # user_site_assignments 테이블 (멱등)
     c.execute("""
         CREATE TABLE IF NOT EXISTS user_site_assignments (
@@ -134,6 +148,22 @@ def _migrate(conn):
     tbm_cols = {row[1] for row in c.execute("PRAGMA table_info(tbm_logs)").fetchall()}
     if 'image_path' not in tbm_cols:
         c.execute("ALTER TABLE tbm_logs ADD COLUMN image_path TEXT DEFAULT ''")
+
+    # 위험성평가 테이블 신설
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS risk_assessments (
+            id           TEXT PRIMARY KEY,
+            project_id   TEXT,
+            eval_date    TEXT NOT NULL DEFAULT '',
+            task_name    TEXT NOT NULL DEFAULT '',
+            evaluator    TEXT NOT NULL DEFAULT '',
+            content      TEXT NOT NULL DEFAULT '',
+            file_name    TEXT NOT NULL DEFAULT '',
+            file_path    TEXT NOT NULL DEFAULT '',
+            creator_id   TEXT DEFAULT '',
+            created_at   TEXT NOT NULL
+        )
+    """)
 
     conn.commit()
 
@@ -258,6 +288,19 @@ def init_db():
             creator_name          TEXT,
             created_at            TEXT NOT NULL,
             updated_at            TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS risk_assessments (
+            id           TEXT PRIMARY KEY,
+            project_id   TEXT,
+            eval_date    TEXT NOT NULL DEFAULT '',
+            task_name    TEXT NOT NULL DEFAULT '',
+            evaluator    TEXT NOT NULL DEFAULT '',
+            content      TEXT NOT NULL DEFAULT '',
+            file_name    TEXT NOT NULL DEFAULT '',
+            file_path    TEXT NOT NULL DEFAULT '',
+            creator_id   TEXT DEFAULT '',
+            created_at   TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS documents (

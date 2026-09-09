@@ -343,7 +343,9 @@ def register_request():
         from werkzeug.security import generate_password_hash as _gph
         pw_hash = _gph(password)
         db.execute(
-            "INSERT INTO pending_users VALUES (?,?,?,?,?,?,?,?,?)",
+            """INSERT INTO pending_users
+               (id, name, department, team, password_hash, status, created_at, reviewed_by, reviewed_at)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
             (pid, name, department, team, pw_hash, 'pending', now_iso(), '', '')
         )
         db.commit()
@@ -2051,6 +2053,83 @@ def delete_notice(nid):
 
 
 
+
+# ── RISK ASSESSMENTS API ──────────────────────────────────────
+@app.route('/api/risk-assessments', methods=['GET'])
+def get_risk_assessments():
+    project_id = request.args.get('projectId', 'all')
+    db = get_db()
+    try:
+        if project_id == 'all':
+            rows = db.execute("SELECT * FROM risk_assessments ORDER BY eval_date DESC").fetchall()
+        else:
+            rows = db.execute("SELECT * FROM risk_assessments WHERE project_id=? ORDER BY eval_date DESC", (project_id,)).fetchall()
+        
+        result = []
+        for r in rows:
+            result.append(row_to_dict(r))
+        return jsonify({'success': True, 'risk_assessments': result})
+    finally:
+        db.close()
+
+
+@app.route('/api/risk-assessments', methods=['POST'])
+def create_risk_assessment():
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        project_id = request.form.get('projectId', '')
+        eval_date  = request.form.get('evalDate', '')
+        task_name  = request.form.get('taskName', '')
+        evaluator  = request.form.get('evaluator', '')
+        content    = request.form.get('content', '')
+        user_id    = request.form.get('userId', '')
+    else:
+        data = request.get_json() or {}
+        project_id = data.get('projectId', '')
+        eval_date  = data.get('evalDate', '')
+        task_name  = data.get('taskName', '')
+        evaluator  = data.get('evaluator', '')
+        content    = data.get('content', '')
+        user_id    = data.get('userId', '')
+    
+    file_name = ''
+    file_path = ''
+    
+    if 'file' in request.files:
+        f = request.files['file']
+        if f and f.filename:
+            file_name = f.filename
+            safe_name = secure_filename(f.filename)
+            unique_name = f"{new_id('riskimg')}_{safe_name}"
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            f.save(save_path)
+            file_path = unique_name
+
+    rid = new_id('risk')
+    n = now_iso()
+    
+    db = get_db()
+    try:
+        db.execute(
+            """INSERT INTO risk_assessments
+               (id, project_id, eval_date, task_name, evaluator, content, file_name, file_path, creator_id, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (rid, project_id, eval_date, task_name, evaluator, content, file_name, file_path, user_id, n)
+        )
+        db.commit()
+        return jsonify({'success': True, 'message': '위험성평가가 등록되었습니다.', 'id': rid})
+    finally:
+        db.close()
+
+
+@app.route('/api/risk-assessments/<rid>', methods=['DELETE'])
+def delete_risk_assessment(rid):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM risk_assessments WHERE id=?", (rid,))
+        db.commit()
+        return jsonify({'success': True, 'message': '삭제되었습니다.'})
+    finally:
+        db.close()
 
 # ── 앱 시작 ─────────────────────────────────────────────────
 if __name__ == '__main__':

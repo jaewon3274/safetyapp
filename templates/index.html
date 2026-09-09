@@ -843,6 +843,7 @@
           <div class="sidebar-item" onclick="navigateTo('workers')" id="nav-workers">👷 근로자 이력정보</div>
           <div class="sidebar-item" onclick="navigateTo('workplan')" id="nav-workplan">📋 작업계획서</div>
           <div class="sidebar-item" onclick="navigateTo('tbm')" id="nav-tbm">📢 TBM 일지</div>
+          <div class="sidebar-item" onclick="navigateTo('risk')" id="nav-risk">⚠️ 위험성평가</div>
           <div class="sidebar-section">자료</div>
           <div class="sidebar-item" onclick="navigateTo('docs')" id="nav-docs">📁 문서 관리</div>
           <div class="sidebar-item" onclick="navigateTo('notice')" id="nav-notice">📣 공지</div>
@@ -1070,6 +1071,45 @@
                     </tr>
                   </thead>
                   <tbody id="tbm-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── RISK ASSESSMENTS ── -->
+          <div class="page" id="page-risk">
+            <div class="section-title">⚠️ 위험성평가</div>
+            <div class="section-desc">현장의 위험성평가를 등록하고 조회합니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title" style="display:flex;align-items:center;gap:12px;">
+                  위험성평가 목록
+                  <select id="filter-risk-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadRiskAssessments()">
+                    <option value="all">전체 현장</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" id="add-risk-btn" onclick="openRiskModal()">+ 등록</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>평가일자</th>
+                      <th>작업명</th>
+                      <th>평가자</th>
+                      <th>등록일시</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="risk-tbody">
                     <tr>
                       <td colspan="5">
                         <div class="loading">
@@ -1409,27 +1449,56 @@
         <button class="modal-close" onclick="closeModal('modal-add-project')">✕</button>
       </div>
       <div class="grid-2" style="gap:12px;">
-        <div class="form-group"><label>공사명 <span style="color:#f85149">*</span></label>
+        <div class="form-group"><label>공사명 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="np-name" placeholder="공사명을 입력하세요"></div>
-        <div class="form-group"><label>업체명 <span style="color:#f85149">*</span></label>
+        <div class="form-group"><label>업체명 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="np-contractor" placeholder="시공사명"></div>
-        <div class="form-group"><label>착공일 <span style="color:#f85149">*</span></label>
+        <div class="form-group"><label>착공일 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="np-start" placeholder="예: 20260101"
             oninput="autoFormatDate(this)"></div>
-        <div class="form-group"><label>준공일 <span style="color:#f85149">*</span></label>
+        <div class="form-group"><label>준공일 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="np-end" placeholder="예: 20281231"
             oninput="autoFormatDate(this)"></div>
-        <div class="form-group"><label>공사금액 <span style="color:#f85149">*</span></label>
+        <div class="form-group"><label>공사금액</label>
           <input class="form-control" id="np-amount" placeholder="예: 1,500,000,000"
             oninput="autoFormatAmount(this)"></div>
-        <div class="form-group"><label>공사담당자 <span style="color:#f85149">*</span></label>
+        <div class="form-group"><label>공사담당자 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="np-manager" placeholder="현장소장명"></div>
-        <div class="form-group" style="grid-column:1/-1;"><label>현장 주소 <span style="color:#f85149">*</span></label>
+        <div class="form-group" style="grid-column:1/-1;"><label>현장 주소 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="np-location" placeholder="현장 주소를 입력하세요"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-add-project')">취소</button>
         <button class="btn btn-primary" onclick="saveNewProject()">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 위험성평가 모달 -->
+  <div class="modal-overlay" id="modal-add-risk">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-header">
+        <div class="modal-title">⚠️ 위험성평가 등록</div>
+        <button class="modal-close" onclick="closeModal('modal-add-risk')">✕</button>
+      </div>
+      <div class="form-group"><label>현장 <span style="color:#f85149">* (필수)</span></label>
+        <select class="form-control" id="risk-project"></select>
+      </div>
+      <div class="grid-2" style="gap:12px;">
+        <div class="form-group"><label>평가일자 <span style="color:#f85149">* (필수)</span></label>
+          <input type="date" class="form-control" id="risk-date"></div>
+        <div class="form-group"><label>평가자 <span style="color:#f85149">* (필수)</span></label>
+          <input class="form-control" id="risk-evaluator" placeholder="작성자 성명"></div>
+      </div>
+      <div class="form-group"><label>평가 대상 작업 (작업명) <span style="color:#f85149">* (필수)</span></label>
+        <input class="form-control" id="risk-task" placeholder="예: 시스템비계 설치 작업"></div>
+      <div class="form-group"><label>내용 및 위험성 감소 대책 <span style="color:#f85149">* (필수)</span></label>
+        <textarea class="form-control" id="risk-content" rows="4" placeholder="내용을 입력하세요"></textarea></div>
+      <div class="form-group"><label>관련 파일 첨부 (선택)</label>
+        <input type="file" class="form-control" id="risk-file"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-add-risk')">취소</button>
+        <button class="btn btn-primary" onclick="saveRiskAssessment()">등록</button>
       </div>
     </div>
   </div>
@@ -1556,12 +1625,12 @@
       if (pageEl) pageEl.classList.add('active');
       if (navEl) navEl.classList.add('active');
       // 타이틀
-      const titles = { dashboard: '대시보드', project: '공사정보 관리', workers: '근로자 이력정보', workplan: '작업계획서', tbm: 'TBM 일지', docs: '문서 관리', auditlog: '감사 로그', accounts: '계정 관리', notice: '공지' };
+      const titles = { dashboard: '대시보드', project: '공사정보 관리', workers: '근로자 이력정보', workplan: '작업계획서', tbm: 'TBM 일지', risk: '위험성평가', docs: '문서 관리', auditlog: '감사 로그', accounts: '계정 관리', notice: '공지' };
       document.getElementById('topbar-title').textContent = titles[page] || page;
       // 히스토리
       if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
       // 데이터 로드
-      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
       if (loaders[page]) loaders[page]();
       // 계정 관리는 관리자만
       if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
@@ -2029,6 +2098,88 @@
     function delTbm(id) {
       confirm2('TBM 삭제', 'TBM 일지를 삭제하시겠습니까?', async () => {
         try { await api(`/api/tbm/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadTbmList(); } catch (e) { toast(e.message, 'error'); }
+      }, '삭제 확인', 'btn-danger');
+    }
+
+    // ── Risk Assessments ───────────────────────────────────────
+    async function loadRiskAssessments() {
+      try {
+        const projId = document.getElementById('filter-risk-project')?.value || 'all';
+        const data = await api(`/api/risk-assessments?userId=${currentUser?.id || ''}&projectId=${projId}`);
+        const list = data.risk_assessments || [];
+        const tbody = document.getElementById('risk-tbody');
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">⚠️</div><p>위험성평가 기록이 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = list.map(r => {
+          return `<tr>
+      <td class="fw-600" style="white-space:nowrap;">${esc(r.eval_date)}</td>
+      <td>
+        <div style="font-weight:bold;margin-bottom:4px;">${esc(r.task_name)}</div>
+        <div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;">${esc(r.content)}</div>
+        ${r.file_path ? `
+          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin-top:8px;">
+            <img src="/uploads/${encodeURIComponent(r.file_path)}" alt="위험성평가 사진" style="max-width:80px;max-height:80px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(r.file_path)}')"/>
+            <a href="/uploads/${encodeURIComponent(r.file_path)}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️ ${esc(r.file_name || '다운로드')}</a>
+          </div>` : ''}
+      </td>
+      <td class="td-muted">${esc(r.evaluator)}</td>
+      <td class="td-muted">${fmtDate(r.created_at)}</td>
+      <td>
+        <div class="td-actions" style="display:inline-flex;">
+          <button class="btn btn-danger btn-sm" onclick="delRisk('${r.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+        }).join('');
+      } catch (e) { toast('위험성평가 로딩 실패: ' + e.message, 'error'); }
+    }
+    
+    function openRiskModal() {
+      ['risk-date', 'risk-evaluator', 'risk-task', 'risk-content', 'risk-file'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('risk-date').value = new Date().toISOString().slice(0, 10);
+      
+      const projSelect = document.getElementById('risk-project');
+      projSelect.innerHTML = projectDataList.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+      
+      openModal('modal-add-risk');
+    }
+    
+    async function saveRiskAssessment() {
+      const projId = document.getElementById('risk-project').value;
+      const date = document.getElementById('risk-date').value;
+      const evaluator = document.getElementById('risk-evaluator').value.trim();
+      const task = document.getElementById('risk-task').value.trim();
+      const content = document.getElementById('risk-content').value.trim();
+      
+      if (!projId || !date || !evaluator || !task || !content) { toast('필수 항목을 모두 입력하세요.', 'error'); return; }
+      
+      const fileInput = document.getElementById('risk-file');
+      
+      try {
+        const fd = new FormData();
+        fd.append('projectId', projId);
+        fd.append('evalDate', date);
+        fd.append('evaluator', evaluator);
+        fd.append('taskName', task);
+        fd.append('content', content);
+        fd.append('userId', currentUser?.id || '');
+        
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          fd.append('file', fileInput.files[0]);
+        }
+        
+        const res = await fetch('/api/risk-assessments', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '등록 실패');
+        
+        toast(data.message || '등록되었습니다.', 'success');
+        closeModal('modal-add-risk');
+        loadRiskAssessments();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    
+    function delRisk(id) {
+      confirm2('삭제 확인', '이 위험성평가를 삭제하시겠습니까?', async () => {
+        try { await api(`/api/risk-assessments/${id}`, { method: 'DELETE' }); toast('삭제됨', 'success'); loadRiskAssessments(); } catch (e) { toast(e.message, 'error'); }
       }, '삭제 확인', 'btn-danger');
     }
 
