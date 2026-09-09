@@ -132,12 +132,14 @@ def _migrate(conn):
         )
     """)
 
-    # workers 테이블 신규 컬럼 추가 (hire_date, notes)
+    # workers 테이블 신규 컬럼 추가 (hire_date, notes, image_path)
     wrk_cols = {row[1] for row in c.execute("PRAGMA table_info(workers)").fetchall()}
     if 'hire_date' not in wrk_cols:
         c.execute("ALTER TABLE workers ADD COLUMN hire_date TEXT DEFAULT ''")
     if 'notes' not in wrk_cols:
         c.execute("ALTER TABLE workers ADD COLUMN notes TEXT DEFAULT ''")
+    if 'image_path' not in wrk_cols:
+        c.execute("ALTER TABLE workers ADD COLUMN image_path TEXT DEFAULT ''")
 
     # workplans 테이블 image_path 컬럼 추가
     wp_cols = {row[1] for row in c.execute("PRAGMA table_info(workplans)").fetchall()}
@@ -162,6 +164,21 @@ def _migrate(conn):
             file_path    TEXT NOT NULL DEFAULT '',
             creator_id   TEXT DEFAULT '',
             created_at   TEXT NOT NULL
+        )
+    """)
+
+    # 작업일보 테이블 신설
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS daily_reports (
+            id           TEXT PRIMARY KEY,
+            project_id   TEXT,
+            work_date    TEXT NOT NULL DEFAULT '',
+            work_content TEXT NOT NULL DEFAULT '',
+            manager_name TEXT NOT NULL DEFAULT '',
+            status       TEXT NOT NULL DEFAULT 'planned',
+            creator_id   TEXT DEFAULT '',
+            created_at   TEXT NOT NULL,
+            image_path   TEXT DEFAULT ''
         )
     """)
 
@@ -243,6 +260,7 @@ def init_db():
             contact     TEXT DEFAULT '',
             job_type    TEXT NOT NULL,
             site_name   TEXT DEFAULT '',
+            image_path  TEXT DEFAULT '',
             created_at  TEXT NOT NULL,
             updated_at  TEXT NOT NULL
         );
@@ -297,11 +315,24 @@ def init_db():
             task_name    TEXT NOT NULL DEFAULT '',
             evaluator    TEXT NOT NULL DEFAULT '',
             content      TEXT NOT NULL DEFAULT '',
-            file_name    TEXT NOT NULL DEFAULT '',
-            file_path    TEXT NOT NULL DEFAULT '',
+            file_name    TEXT DEFAULT '',
+            file_path    TEXT DEFAULT '',
             creator_id   TEXT DEFAULT '',
             created_at   TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS daily_reports (
+            id           TEXT PRIMARY KEY,
+            project_id   TEXT,
+            work_date    TEXT NOT NULL DEFAULT '',
+            work_content TEXT NOT NULL DEFAULT '',
+            manager_name TEXT NOT NULL DEFAULT '',
+            status       TEXT NOT NULL DEFAULT 'planned',
+            creator_id   TEXT DEFAULT '',
+            created_at   TEXT NOT NULL,
+            image_path   TEXT DEFAULT ''
+        );
+
 
         CREATE TABLE IF NOT EXISTS documents (
             id                  TEXT PRIMARY KEY,

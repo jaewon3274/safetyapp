@@ -883,19 +883,47 @@ def get_workers():
 
 @app.route('/api/workers', methods=['POST'])
 def create_worker():
-    data = request.get_json()
-    user = get_user(data.get('userId'))
-    name = data.get('name', '').strip()
-    job_type = data.get('job_type', data.get('jobType', '')).strip()
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        user_id = request.form.get('userId')
+        name = request.form.get('name', '').strip()
+        job_type = request.form.get('job_type', request.form.get('jobType', '')).strip()
+        nationality = request.form.get('nationality', '대한민국')
+        hire_date = request.form.get('hire_date', '')
+        notes = request.form.get('notes', '')
+        project_id_input = request.form.get('projectId', '')
+        site_name_input = request.form.get('siteName', '')
+    else:
+        data = request.get_json() or {}
+        user_id = data.get('userId')
+        name = data.get('name', '').strip()
+        job_type = data.get('job_type', data.get('jobType', '')).strip()
+        nationality = data.get('nationality', '대한민국')
+        hire_date = data.get('hire_date', '')
+        notes = data.get('notes', '')
+        project_id_input = data.get('projectId', '')
+        site_name_input = data.get('siteName', '')
+
+    user = get_user(user_id)
     if not name:
         return jsonify({'error': '이름을 입력해주세요.'}), 400
+        
+    image_path = ''
+    if 'file' in request.files:
+        f = request.files['file']
+        if f and f.filename:
+            ext = os.path.splitext(f.filename)[1] or '.jpg'
+            unique_name = f"wrk_{new_id('img')}{ext}"
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            f.save(save_path)
+            image_path = unique_name
+
     active_id = get_active_project_id()
     db = get_db()
     try:
         active_proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (active_id,)).fetchone()) if active_id else None
         wid = new_id('wrk')
         n = now_iso()
-        site_name = data.get('siteName') or (active_proj['project_name'] if active_proj else '')
+        site_name = site_name_input or (active_proj['project_name'] if active_proj else '')
         # creator_id 컬럼 반영
         cols = {row[1] for row in db.execute("PRAGMA table_info(workers)").fetchall()}
         if 'creator_id' not in cols:
@@ -903,14 +931,14 @@ def create_worker():
             db.commit()
 
         db.execute(
-            "INSERT INTO workers (id, project_id, name, birth_date, gender, nationality, contact, job_type, site_name, created_at, updated_at, hire_date, notes, creator_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (wid, data.get('projectId') or active_id,
+            "INSERT INTO workers (id, project_id, name, birth_date, gender, nationality, contact, job_type, site_name, created_at, updated_at, hire_date, notes, creator_id, image_path) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (wid, project_id_input or active_id,
              name, '',        # birth_date
              '남',            # gender
-             data.get('nationality', '대한민국'),
+             nationality,
              '',              # contact
              job_type, site_name, n, n,
-             data.get('hire_date', ''), data.get('notes', ''), user['id'] if user else '')
+             hire_date, notes, user['id'] if user else '', image_path)
         )
         db.commit()
         worker = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
@@ -936,21 +964,49 @@ def get_worker_one(wid):
 
 @app.route('/api/workers/<wid>', methods=['PUT'])
 def update_worker(wid):
-    data = request.get_json()
-    user = get_user(data.get('userId'))
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        user_id = request.form.get('userId')
+        name_input = request.form.get('name')
+        nationality_input = request.form.get('nationality')
+        job_type_input = request.form.get('job_type', request.form.get('jobType'))
+        hire_date_input = request.form.get('hire_date')
+        notes_input = request.form.get('notes')
+    else:
+        data = request.get_json() or {}
+        user_id = data.get('userId')
+        name_input = data.get('name')
+        nationality_input = data.get('nationality')
+        job_type_input = data.get('job_type', data.get('jobType'))
+        hire_date_input = data.get('hire_date')
+        notes_input = data.get('notes')
+
+    user = get_user(user_id)
+    
     db = get_db()
     try:
         worker = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
         if not worker:
             return jsonify({'error': '근로자 정보를 찾을 수 없습니다.'}), 404
-        name = data.get('name') or worker['name']
-        nationality = data.get('nationality') or worker.get('nationality','')
-        job_type = data.get('job_type', data.get('jobType')) or worker.get('job_type','')
-        hire_date = data.get('hire_date') or worker.get('hire_date','')
-        notes = data.get('notes') if data.get('notes') is not None else worker.get('notes','')
+            
+        image_path = worker.get('image_path', '')
+        if 'file' in request.files:
+            f = request.files['file']
+            if f and f.filename:
+                ext = os.path.splitext(f.filename)[1] or '.jpg'
+                unique_name = f"wrk_{new_id('img')}{ext}"
+                save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+                f.save(save_path)
+                image_path = unique_name
+
+        name = name_input or worker['name']
+        nationality = nationality_input or worker.get('nationality','')
+        job_type = job_type_input or worker.get('job_type','')
+        hire_date = hire_date_input or worker.get('hire_date','')
+        notes = notes_input if notes_input is not None else worker.get('notes','')
+        
         db.execute(
-            """UPDATE workers SET name=?, nationality=?, job_type=?, hire_date=?, notes=?, updated_at=? WHERE id=?""",
-            (name, nationality, job_type, hire_date, notes, now_iso(), wid)
+            """UPDATE workers SET name=?, nationality=?, job_type=?, hire_date=?, notes=?, image_path=?, updated_at=? WHERE id=?""",
+            (name, nationality, job_type, hire_date, notes, image_path, now_iso(), wid)
         )
         db.commit()
         updated = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
@@ -2131,7 +2187,153 @@ def delete_risk_assessment(rid):
     finally:
         db.close()
 
+
+# ════════════════════════════════════════════════════════════
+# 16. 작업일보 API  /api/daily-reports
+# ════════════════════════════════════════════════════════════
+@app.route('/api/daily-reports', methods=['GET'])
+def get_daily_reports():
+    user_id = request.args.get('userId', '').strip()
+    view_as = request.args.get('viewAsUserId', '').strip()
+    u = get_user(user_id)
+    if u and u.get('role') == 'admin' and view_as:
+        user_id = view_as
+    project_id = request.args.get('projectId', 'all')
+    db = get_db()
+    try:
+        assigned = get_user_assigned_project_ids(user_id) if user_id else None
+        sql = "SELECT * FROM daily_reports WHERE 1=1"
+        params = []
+        if assigned is None:
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
+        elif len(assigned) == 0:
+            sql += " AND creator_id = ?"
+            params.append(user_id)
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
+        else:
+            if project_id and project_id != 'all' and project_id in assigned:
+                sql += " AND (project_id=? OR creator_id=?)"
+                params.extend([project_id, user_id])
+            else:
+                sql += f" AND (project_id IN ({','.join('?'*len(assigned))}) OR creator_id = ?)"
+                params.extend(assigned)
+                params.append(user_id)
+        sql += " ORDER BY created_at DESC"
+        reports = rows_to_list(db.execute(sql, params).fetchall())
+        return jsonify({'success': True, 'daily_reports': reports})
+    finally:
+        db.close()
+
+@app.route('/api/daily-reports', methods=['POST'])
+def create_daily_report():
+    user = get_user(request.form.get('userId'))
+    active_id = get_active_project_id()
+    
+    image_path = ''
+    files = request.files.getlist('files')
+    if not files:
+        f = request.files.get('file')
+        if f and f.filename: files = [f]
+    saved = []
+    for f in files:
+        if f and f.filename:
+            ext = os.path.splitext(f.filename)[1] or '.jpg'
+            unique_name = f"dr_{new_id('img')}{ext}"
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            f.save(save_path)
+            try:
+                img = Image.open(save_path)
+                img.thumbnail((1200, 1200))
+                img.save(save_path, optimize=True, quality=85)
+            except Exception: pass
+            saved.append(unique_name)
+    if saved: image_path = ','.join(saved)
+    
+    did = new_id('dr')
+    n = now_iso()
+    db = get_db()
+    try:
+        db.execute(
+            """INSERT INTO daily_reports 
+                 (id, project_id, work_date, work_content, manager_name, status, creator_id, created_at, image_path)
+                 VALUES (?,?,?,?,?,?,?,?,?)""",
+            (did, request.form.get('projectId') or active_id,
+             request.form.get('work_date',''), request.form.get('work_content',''),
+             request.form.get('manager_name',''), request.form.get('status','planned'),
+             user['id'] if user else '', n, image_path)
+        )
+        db.commit()
+        report = row_to_dict(db.execute("SELECT * FROM daily_reports WHERE id=?", (did,)).fetchone())
+        return jsonify({'success': True, 'daily_report': report})
+    finally:
+        db.close()
+
+@app.route('/api/daily-reports/<did>', methods=['PUT'])
+def update_daily_report(did):
+    user = get_user(request.form.get('userId'))
+    
+    image_path = ''
+    files = request.files.getlist('files')
+    if not files:
+        f = request.files.get('file')
+        if f and f.filename: files = [f]
+    saved = []
+    for f in files:
+        if f and f.filename:
+            ext = os.path.splitext(f.filename)[1] or '.jpg'
+            unique_name = f"dr_{new_id('img')}{ext}"
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            f.save(save_path)
+            try:
+                img = Image.open(save_path)
+                img.thumbnail((1200, 1200))
+                img.save(save_path, optimize=True, quality=85)
+            except Exception: pass
+            saved.append(unique_name)
+    if saved:
+        db_tmp = get_db()
+        try:
+            old = row_to_dict(db_tmp.execute("SELECT image_path FROM daily_reports WHERE id=?", (did,)).fetchone())
+            old_imgs = (old or {}).get('image_path', '')
+            if old_imgs:
+                image_path = old_imgs + ',' + ','.join(saved)
+            else:
+                image_path = ','.join(saved)
+        finally:
+            db_tmp.close()
+
+    db = get_db()
+    try:
+        if image_path:
+            db.execute("""UPDATE daily_reports SET work_date=?, work_content=?, manager_name=?, status=?, image_path=? WHERE id=?""",
+                       (request.form.get('work_date',''), request.form.get('work_content',''),
+                        request.form.get('manager_name',''), request.form.get('status',''), image_path, did))
+        else:
+            db.execute("""UPDATE daily_reports SET work_date=?, work_content=?, manager_name=?, status=? WHERE id=?""",
+                       (request.form.get('work_date',''), request.form.get('work_content',''),
+                        request.form.get('manager_name',''), request.form.get('status',''), did))
+        db.commit()
+        report = row_to_dict(db.execute("SELECT * FROM daily_reports WHERE id=?", (did,)).fetchone())
+        return jsonify({'success': True, 'daily_report': report})
+    finally:
+        db.close()
+
+@app.route('/api/daily-reports/<did>', methods=['DELETE'])
+def delete_daily_report(did):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM daily_reports WHERE id=?", (did,))
+        db.commit()
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
 # ── 앱 시작 ─────────────────────────────────────────────────
+
 if __name__ == '__main__':
     import sys
     sys.stdout.reconfigure(encoding='utf-8', errors='replace') if hasattr(sys.stdout, 'reconfigure') else None
@@ -2143,4 +2345,5 @@ if __name__ == '__main__':
     print("   Stop: Ctrl+C")
     print("=" * 60)
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.run(host='0.0.0.0', port=port, debug=True)

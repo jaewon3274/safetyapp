@@ -842,6 +842,7 @@
           <div class="sidebar-item" onclick="navigateTo('project')" id="nav-project">🏗️ 공사정보 관리</div>
           <div class="sidebar-item" onclick="navigateTo('workers')" id="nav-workers">👷 근로자 이력정보</div>
           <div class="sidebar-item" onclick="navigateTo('workplan')" id="nav-workplan">📋 작업계획서</div>
+          <div class="sidebar-item" onclick="navigateTo('daily')" id="nav-daily">📰 작업일보</div>
           <div class="sidebar-item" onclick="navigateTo('tbm')" id="nav-tbm">📢 TBM 일지</div>
           <div class="sidebar-item" onclick="navigateTo('risk')" id="nav-risk">⚠️ 위험성평가</div>
           <div class="sidebar-section">자료</div>
@@ -1042,6 +1043,38 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+
+          
+          <!-- ── DAILY REPORTS (작업일보) ── -->
+          <div class="page" id="page-daily">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+              <div>
+                <div class="section-title">📰 작업일보</div>
+                <div class="section-desc">매일 진행된 작업 내용을 기록하고 관리합니다.</div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <select class="form-control" id="filter-daily-project" onchange="loadDailyReports()" style="width:180px;">
+                  <option value="all">전체 공사</option>
+                </select>
+                <button class="btn btn-primary" onclick="openDailyModal()">+ 작업일보 등록</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>일자</th>
+                    <th>작업내용</th>
+                    <th>담당자</th>
+                    <th>상태</th>
+                    <th>사진</th>
+                    <th style="width:100px;">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="daily-tbody"></tbody>
+              </table>
             </div>
           </div>
 
@@ -1372,6 +1405,39 @@
     </div>
   </div>
 
+  
+  <!-- 작업일보 모달 -->
+  <div class="modal-overlay" id="modal-daily">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="daily-modal-title">작업일보 추가</div>
+        <button class="modal-close" onclick="closeModal('modal-daily')">✕</button>
+      </div>
+      <div class="form-group">
+        <label>공사 선택 * (필수)</label>
+        <select class="form-control" id="daily-proj"></select>
+      </div>
+      <div class="form-group"><label>일자 * (필수)</label><input class="form-control" type="date" id="daily-date"></div>
+      <div class="form-group"><label>작업내용 * (필수)</label><textarea class="form-control" id="daily-content" rows="3" placeholder="금일 작업내용을 입력하세요"></textarea></div>
+      <div class="form-group"><label>담당자 * (필수)</label><input class="form-control" id="daily-manager"></div>
+      <div class="form-group"><label>상태</label>
+        <select class="form-control" id="daily-status">
+          <option value="작업중">작업중</option>
+          <option value="완료">완료</option>
+          <option value="보류">보류</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>사진 (여러 장 선택 가능)</label>
+        <input class="form-control" type="file" id="daily-photo" accept="image/*" multiple>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-daily')">취소</button>
+        <button class="btn btn-primary" onclick="saveDailyReport()">저장</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TBM 모달 -->
   <div class="modal-overlay" id="modal-tbm">
     <div class="modal" style="max-width:600px;">
@@ -1630,7 +1696,7 @@
       // 히스토리
       if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
       // 데이터 로드
-      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
       if (loaders[page]) loaders[page]();
       // 계정 관리는 관리자만
       if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
@@ -2012,6 +2078,114 @@
           toast('삭제되었습니다.', 'success'); loadWorkers();
         } catch (e) { toast(e.message, 'error'); }
       }, '🗑️ 삭제 확인', 'btn-danger');
+    }
+
+    
+    // ── Daily Reports ────────────────────────────────────────────────
+    let editingDailyId = null;
+    async function loadDailyReports() {
+      try {
+        const viewAs = document.getElementById('view-as-employee')?.value || '';
+        const projId = document.getElementById('filter-daily-project')?.value || 'all';
+        const data = await api(`/api/daily-reports?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}`);
+        const list = data.daily_reports || [];
+        const tbody = document.getElementById('daily-tbody');
+        const canEdit = currentUser?.role === 'admin';
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📰</div><p>작업일보 내역이 없습니다.</p></div></td></tr>`; return; }
+        
+        tbody.innerHTML = list.map(d => {
+          const imgs = (d.image_path || '').split(',').filter(x => x.trim());
+          return `<tr>
+            <td class="fw-600">${esc(d.work_date)}</td>
+            <td style="white-space:pre-wrap;">${esc(d.work_content)}</td>
+            <td class="td-muted">${esc(d.manager_name)}</td>
+            <td>
+              <span class="badge ${d.status === '완료' ? 'badge-success' : 'badge-amber'}">${esc(d.status)}</span>
+            </td>
+            <td>
+              ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
+                <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
+                  <img src="/uploads/${encodeURIComponent(img.trim())}" alt="사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
+                  <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
+                </div>`).join('') + `</div>` : '-'}
+            </td>
+            <td>
+              <div class="td-actions" style="display:inline-flex;">
+                <button class="btn btn-secondary btn-sm" onclick="openDailyModal('${d.id}', '${esc(d.project_id)}', '${esc(d.work_date)}', '${esc(d.work_content)}', '${esc(d.manager_name)}', '${esc(d.status)}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="delDailyReport('${d.id}')">🗑️</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      } catch (e) { toast('작업일보 로딩 실패: ' + e.message, 'error'); }
+    }
+    
+    function openDailyModal(id, pId, date, content, manager, status) {
+      editingDailyId = id;
+      document.getElementById('daily-modal-title').textContent = id ? '작업일보 수정' : '작업일보 추가';
+      const sel = document.getElementById('daily-proj');
+      sel.innerHTML = projectDataList.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+      
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      const d = String(today.getDate()).padStart(2, '0');
+      
+      document.getElementById('daily-proj').value = pId || '';
+      document.getElementById('daily-date').value = date || `${y}-${m}-${d}`;
+      document.getElementById('daily-content').value = content || '';
+      document.getElementById('daily-manager').value = manager || '';
+      document.getElementById('daily-status').value = status || '작업중';
+      document.getElementById('daily-photo').value = '';
+      
+      openModal('modal-daily');
+    }
+    
+    async function saveDailyReport() {
+      const projId = document.getElementById('daily-proj').value;
+      const date = document.getElementById('daily-date').value;
+      const content = document.getElementById('daily-content').value.trim();
+      const manager = document.getElementById('daily-manager').value.trim();
+      const status = document.getElementById('daily-status').value;
+      
+      if (!projId || !date || !content || !manager) { toast('필수 항목을 모두 입력하세요.', 'error'); return; }
+      
+      try {
+        const fd = new FormData();
+        fd.append('projectId', projId);
+        fd.append('work_date', date);
+        fd.append('work_content', content);
+        fd.append('manager_name', manager);
+        fd.append('status', status);
+        fd.append('userId', currentUser?.id || '');
+        
+        const photoInput = document.getElementById('daily-photo');
+        if (photoInput && photoInput.files) {
+          for (let i = 0; i < photoInput.files.length; i++) {
+            fd.append('files', photoInput.files[i]);
+          }
+        }
+        
+        const method = editingDailyId ? 'PUT' : 'POST';
+        const url = editingDailyId ? `/api/daily-reports/${editingDailyId}` : '/api/daily-reports';
+        
+        const res = await fetch(url, { method, body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '저장 실패');
+        
+        toast(editingDailyId ? '수정되었습니다.' : '저장되었습니다.', 'success');
+        closeModal('modal-daily'); loadDailyReports();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    
+    function delDailyReport(id) {
+      confirm2('삭제 확인', '이 작업일보를 삭제하시겠습니까?', async () => {
+        try {
+          await api(`/api/daily-reports/${id}?userId=${currentUser?.id || ''}`, { method: 'DELETE' });
+          toast('삭제되었습니다.', 'success');
+          loadDailyReports();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '🗑️ 삭제', 'btn-danger');
     }
 
     // ── TBM ───────────────────────────────────────────────────
@@ -2477,7 +2651,7 @@
     function onViewAsChange() {
       const page = document.querySelector('.page.active')?.id?.replace('page-', '');
       if (page) {
-        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, tbm: loadTbmList, docs: loadDocs };
+        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
         if (loaders[page]) loaders[page]();
       }
     }
