@@ -1922,7 +1922,21 @@ def get_stats():
         
         if is_admin:
             # 관리자용: 전체 데이터 
-            total_docs = db.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            docs_cnt = db.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs").fetchone()[0]
+            plan_cnt = db.execute("SELECT COUNT(*) FROM workplans").fetchone()[0]
+            try:
+                daily_cnt = db.execute("SELECT COUNT(*) FROM daily_reports").fetchone()[0]
+            except:
+                daily_cnt = 0
+            try:
+                risk_cnt = db.execute("SELECT COUNT(*) FROM risk_assessments").fetchone()[0]
+            except:
+                risk_cnt = 0
+            
+            # 전체 문서 = 문서관리 + TBM + 작업계획서 + 작업일보 + 위험성평가
+            total_docs = docs_cnt + tbm_cnt + plan_cnt + daily_cnt + risk_cnt
+            
             total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents").fetchone()[0]
             excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel'").fetchone()[0]
             image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image'").fetchone()[0]
@@ -1934,11 +1948,29 @@ def get_stats():
             user_cnt = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             worker_cnt = db.execute("SELECT COUNT(*) FROM workers").fetchone()[0]
             proj_cnt = db.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
-            tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs").fetchone()[0]
-            plan_cnt = db.execute("SELECT COUNT(*) FROM workplans").fetchone()[0]
         else:
-            # 일반 직원용: 본인 데이터 기준 (또는 지정된 예외만)
-            total_docs = db.execute("SELECT COUNT(*) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
+            # 일반 직원용: 본인 데이터 기준 
+            docs_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
+            try:
+                tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                tbm_cnt = 0
+            try:
+                plan_cnt = db.execute("SELECT COUNT(*) FROM workplans WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                plan_cnt = 0
+            try:
+                daily_cnt = db.execute("SELECT COUNT(*) FROM daily_reports WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                daily_cnt = 0
+            try:
+                risk_cnt = db.execute("SELECT COUNT(*) FROM risk_assessments WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                risk_cnt = 0
+            
+            # 전체 문서 = 본인이 작성한 (문서관리 + TBM + 작업계획서 + 작업일보 + 위험성평가)
+            total_docs = docs_cnt + tbm_cnt + plan_cnt + daily_cnt + risk_cnt
+
             total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
             excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel' AND uploader_id=?", (user_id,)).fetchone()[0]
             image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image' AND uploader_id=?", (user_id,)).fetchone()[0]
@@ -1949,21 +1981,10 @@ def get_stats():
             
             user_cnt = 0 # 일반 직원은 사용자 수를 볼 필요가 없거나 0으로 처리
             
-            # 여기서 try-except를 쓰는 이유는, 간혹 테이블에 creator_id가 없을 경우를 대비하기 위함입니다 (이전 스크립트 실행 환경 차이).
             try:
                 worker_cnt = db.execute("SELECT COUNT(*) FROM workers WHERE creator_id=?", (user_id,)).fetchone()[0]
             except:
                 worker_cnt = 0
-                
-            try:
-                tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs WHERE creator_id=?", (user_id,)).fetchone()[0]
-            except:
-                tbm_cnt = 0
-                
-            try:
-                plan_cnt = db.execute("SELECT COUNT(*) FROM workplans WHERE creator_id=?", (user_id,)).fetchone()[0]
-            except:
-                plan_cnt = 0
             
             assigned = get_user_assigned_project_ids(user_id) or []
             if len(assigned) == 0:
@@ -2010,7 +2031,7 @@ def get_dashboard_recent():
         ).fetchall()
         
         docs = db.execute(
-            "SELECT '문서 관리' as type, title, uploader_name as author_name, created_at, original_file_name as file_name, file_name as file_path "
+            "SELECT '문서 관리' as type, title, uploader_name as author_name, created_at, original_file_name as file_name, file_path "
             "FROM documents "
             "WHERE is_deleted=0 AND uploader_role='admin'"
         ).fetchall()
