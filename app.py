@@ -152,14 +152,19 @@ def can_access_doc(doc, user):
     return True
 
 
+def get_current_user_id():
+    return session.get('user_id')
+
 def get_user(user_id=None):
     db = get_db()
     try:
+        if not user_id:
+            user_id = get_current_user_id()
         if user_id:
             row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-        else:
-            row = db.execute("SELECT * FROM users LIMIT 1").fetchone()
-        return row_to_dict(row)
+            if row:
+                return row_to_dict(row)
+        return None
     finally:
         db.close()
 
@@ -261,6 +266,12 @@ def static_file(filename):
 # ════════════════════════════════════════════════════════════
 # 1. 인증 & 사용자 관리 API
 # ════════════════════════════════════════════════════════════
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({'success': True})
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -321,6 +332,8 @@ def login():
                     "SELECT id, project_name, start_date, end_date, site_manager, client_name FROM projects ORDER BY updated_at DESC"
                 ).fetchall()
                 assigned_projects = rows_to_list(all_proj_rows)
+            session['user_id'] = user['id']
+            session['role'] = user['role']
             return jsonify({'success': True, 'user': user, 'assignedProjects': assigned_projects})
         return jsonify({'error': '사용자를 찾을 수 없습니다.'}), 404
     finally:
@@ -372,7 +385,7 @@ def register_request():
 
 @app.route('/api/auth/deleted-employees', methods=['GET'])
 def get_deleted_employees():
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     admin = get_user(user_id)
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '권한이 없습니다.'}), 403
@@ -388,7 +401,7 @@ def get_deleted_employees():
 @app.route('/api/auth/hard-delete-accounts', methods=['POST'])
 def hard_delete_accounts():
     data = request.get_json() or {}
-    user_id = data.get('userId')
+    user_id = get_current_user_id()
     account_ids = data.get('accountIds', [])
     admin = get_user(user_id)
     if not admin or admin['role'] != 'admin':
@@ -412,7 +425,7 @@ def hard_delete_accounts():
 @app.route('/api/auth/delete-accounts', methods=['POST'])
 def delete_accounts():
     data = request.get_json() or {}
-    user_id = data.get('userId')
+    user_id = get_current_user_id()
     account_ids = data.get('accountIds', [])
     admin = get_user(user_id)
     if not admin or admin.get('role') != 'admin':
@@ -434,7 +447,7 @@ def delete_accounts():
 @app.route('/api/auth/restore-accounts', methods=['POST'])
 def restore_accounts():
     data = request.get_json() or {}
-    user_id = data.get('userId')
+    user_id = get_current_user_id()
     account_ids = data.get('accountIds', [])
     admin = get_user(user_id)
     if not admin or admin.get('role') != 'admin':
@@ -456,7 +469,7 @@ def restore_accounts():
 @app.route('/api/auth/pending', methods=['GET'])
 def get_pending_users():
     """관리자용: 대기 중인 계정 신청 목록"""
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     admin = get_user(user_id)
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
@@ -474,7 +487,7 @@ def get_pending_users():
 def approve_user(pid):
     """관리자: 계정 신청 승인"""
     data = request.get_json() or {}
-    admin = get_user(data.get('adminUserId'))
+    admin = get_user(get_current_user_id())
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     db = get_db()
@@ -510,7 +523,7 @@ def approve_user(pid):
 def reject_user(pid):
     """관리자: 계정 신청 거절"""
     data = request.get_json() or {}
-    admin = get_user(data.get('adminUserId'))
+    admin = get_user(get_current_user_id())
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     db = get_db()
@@ -532,7 +545,7 @@ def suspend_pending_user(pid):
     """관리자: 신청 계정 승인 후 즉시 미사용(정지) 처리"""
     from werkzeug.security import generate_password_hash as _gph
     data = request.get_json() or {}
-    admin = get_user(data.get('adminUserId'))
+    admin = get_user(get_current_user_id())
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     db = get_db()
@@ -564,7 +577,7 @@ def suspend_pending_user(pid):
 def toggle_user_status(uid):
     """관리자: 직원 계정 활성/미사용 토글"""
     data = request.get_json() or {}
-    admin = get_user(data.get('adminUserId'))
+    admin = get_user(get_current_user_id())
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     db = get_db()
@@ -595,7 +608,7 @@ def reset_password(uid):
     """관리자: 직원 비밀번호 초기화 (→ 0000)"""
     from werkzeug.security import generate_password_hash as _gph
     data = request.get_json() or {}
-    admin = get_user(data.get('adminUserId'))
+    admin = get_user(get_current_user_id())
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     db = get_db()
@@ -616,7 +629,7 @@ def reset_password(uid):
 @app.route('/api/auth/employees', methods=['GET'])
 def get_employees():
     """관리자용: 전체 직원 계정 목록 (배정 현장 포함)"""
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     admin = get_user(user_id)
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
@@ -642,7 +655,7 @@ def get_employees():
 @app.route('/api/auth/employees/<uid>/sites', methods=['GET'])
 def get_user_sites(uid):
     """직원의 배정 현장 목록 조회"""
-    admin_id = request.args.get('adminUserId') or request.args.get('userId')
+    admin_id = get_current_user_id()
     admin = get_user(admin_id)
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
@@ -664,7 +677,7 @@ def get_user_sites(uid):
 def assign_site(uid):
     """관리자: 직원에게 현장 배정"""
     data = request.get_json() or {}
-    admin = get_user(data.get('adminUserId'))
+    admin = get_user(get_current_user_id())
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     project_id = data.get('projectId', '').strip()
@@ -697,7 +710,7 @@ def assign_site(uid):
 @app.route('/api/auth/employees/<uid>/assign/<project_id>', methods=['DELETE'])
 def unassign_site(uid, project_id):
     """관리자: 직원 현장 배정 해제"""
-    admin_id = request.args.get('adminUserId') or request.args.get('userId')
+    admin_id = get_current_user_id()
     admin = get_user(admin_id)
     if not admin or admin.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
@@ -730,9 +743,9 @@ def get_users():
 @app.route('/api/users/role', methods=['POST'])
 def change_user_role():
     data = request.get_json()
-    user_id = data.get('userId')
+    user_id = get_current_user_id()
     new_role = data.get('newRole')
-    admin_id = data.get('adminUserId')
+    admin_id = get_current_user_id()
     db = get_db()
     try:
         admin = row_to_dict(db.execute("SELECT * FROM users WHERE id=?", (admin_id,)).fetchone())
@@ -761,7 +774,7 @@ def project_row(row):
 
 @app.route('/api/project-info', methods=['GET'])
 def get_project_info():
-    user_id = request.args.get('userId', '').strip()
+    user_id = get_current_user_id()
     view_as = request.args.get('viewAsUserId', '').strip()
     user = get_user(user_id) if user_id else None
     if user and user.get('role') == 'admin' and view_as:
@@ -787,7 +800,7 @@ def get_project_info():
 @app.route('/api/project-info', methods=['POST'])
 def create_project():
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     project_name = data.get('projectName', '').strip()
     if not project_name:
         return jsonify({'error': '공사명을 입력해주세요.'}), 400
@@ -832,7 +845,7 @@ def create_project():
 @app.route('/api/project-info', methods=['PUT'])
 def update_project():
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     target_id = data.get('id') or get_active_project_id()
     if not target_id:
         return jsonify({'error': '공사 ID가 없습니다.'}), 400
@@ -889,7 +902,7 @@ def select_project():
 
 @app.route('/api/project-info/<pid>', methods=['DELETE'])
 def delete_project(pid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -920,7 +933,7 @@ def delete_project(pid):
 def batch_delete_projects():
     data = request.get_json()
     ids = data.get('projectIds', [])
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     if not ids:
         return jsonify({'error': '삭제할 공사를 선택해주세요.'}), 400
     db = get_db()
@@ -951,7 +964,7 @@ def batch_delete_projects():
 # ════════════════════════════════════════════════════════════
 @app.route('/api/workers', methods=['GET'])
 def get_workers():
-    user_id = request.args.get('userId', '').strip()
+    user_id = get_current_user_id()
     view_as = request.args.get('viewAsUserId', '').strip()
     u = get_user(user_id)
     if u and u.get('role') == 'admin' and view_as:
@@ -999,7 +1012,7 @@ def get_workers():
 @app.route('/api/workers', methods=['POST'])
 def create_worker():
     if request.content_type and 'multipart/form-data' in request.content_type:
-        user_id = request.form.get('userId')
+        user_id = get_current_user_id()
         name = request.form.get('name', '').strip()
         job_type = request.form.get('job_type', request.form.get('jobType', '')).strip()
         nationality = request.form.get('nationality', '대한민국')
@@ -1009,7 +1022,7 @@ def create_worker():
         site_name_input = request.form.get('siteName', '')
     else:
         data = request.get_json() or {}
-        user_id = data.get('userId')
+        user_id = get_current_user_id()
         name = data.get('name', '').strip()
         job_type = data.get('job_type', data.get('jobType', '')).strip()
         nationality = data.get('nationality', '대한민국')
@@ -1089,7 +1102,7 @@ def get_worker_one(wid):
 @app.route('/api/workers/<wid>', methods=['PUT'])
 def update_worker(wid):
     if request.content_type and 'multipart/form-data' in request.content_type:
-        user_id = request.form.get('userId')
+        user_id = get_current_user_id()
         name_input = request.form.get('name')
         nationality_input = request.form.get('nationality')
         job_type_input = request.form.get('job_type', request.form.get('jobType'))
@@ -1097,7 +1110,7 @@ def update_worker(wid):
         notes_input = request.form.get('notes')
     else:
         data = request.get_json() or {}
-        user_id = data.get('userId')
+        user_id = get_current_user_id()
         name_input = data.get('name')
         nationality_input = data.get('nationality')
         job_type_input = data.get('job_type', data.get('jobType'))
@@ -1165,7 +1178,7 @@ def update_worker(wid):
 
 @app.route('/api/workers/download/<wid>', methods=['GET'])
 def download_worker_file(wid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     if not user:
         user = get_user()
@@ -1189,7 +1202,7 @@ def download_worker_file(wid):
 
 @app.route('/api/workers/<wid>', methods=['DELETE'])
 def delete_worker(wid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1214,7 +1227,7 @@ def delete_worker(wid):
 # ════════════════════════════════════════════════════════════
 @app.route('/api/work-plans', methods=['GET'])
 def get_work_plans():
-    user_id  = request.args.get('userId', '').strip()
+    user_id  = get_current_user_id()
     keyword  = request.args.get('keyword', '').strip()
     plan_cat = request.args.get('planCategory', 'all')
     project_id = request.args.get('projectId', 'all')
@@ -1261,7 +1274,7 @@ def get_work_plans():
 @app.route('/api/work-plans', methods=['POST'])
 def create_work_plan():
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     active_id = request.form.get('projectId') or get_active_project_id() or ''
     db = get_db()
     try:
@@ -1306,7 +1319,7 @@ def create_work_plan():
 @app.route('/api/work-plans/<wid>', methods=['PUT'])
 def update_work_plan(wid):
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     db = get_db()
     try:
         plan = row_to_dict(db.execute("SELECT * FROM work_plans WHERE id=?", (wid,)).fetchone())
@@ -1349,7 +1362,7 @@ def update_work_plan(wid):
 
 @app.route('/api/work-plans/<wid>', methods=['DELETE'])
 def delete_work_plan(wid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1371,7 +1384,7 @@ def delete_work_plan(wid):
 # ════════════════════════════════════════════════════════════
 @app.route('/api/tbm-logs', methods=['GET'])
 def get_tbm_logs():
-    user_id    = request.args.get('userId', '').strip()
+    user_id    = get_current_user_id()
     keyword    = request.args.get('keyword', '').strip()
     project_id = request.args.get('projectId', 'all')
     db = get_db()
@@ -1411,7 +1424,7 @@ def get_tbm_logs():
 @app.route('/api/tbm-logs', methods=['POST'])
 def create_tbm_log():
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     proj_name = (data.get('projectName') or '').strip()
     instructor = (data.get('instructor') or '').strip()
     hazards = (data.get('workDetailsHazards') or '').strip()
@@ -1451,7 +1464,7 @@ def create_tbm_log():
 @app.route('/api/tbm-logs/<tid>', methods=['PUT'])
 def update_tbm_log(tid):
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     db = get_db()
     try:
         tbm = row_to_dict(db.execute("SELECT * FROM tbm_logs WHERE id=?", (tid,)).fetchone())
@@ -1483,7 +1496,7 @@ def update_tbm_log(tid):
 
 @app.route('/api/tbm-logs/<tid>', methods=['DELETE'])
 def delete_tbm_log(tid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1505,7 +1518,7 @@ def delete_tbm_log(tid):
 # ════════════════════════════════════════════════════════════
 @app.route('/api/documents', methods=['GET'])
 def get_documents():
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     keyword = request.args.get('keyword', '').strip()
     file_type = request.args.get('fileType', 'all')
     main_cat = request.args.get('mainCategory', 'all')
@@ -1565,7 +1578,7 @@ def get_documents():
 
 @app.route('/api/documents/upload', methods=['POST'])
 def upload_document():
-    user_id = request.form.get('uploaderId') or request.form.get('userId')
+    user_id = request.form.get('uploaderId') or get_current_user_id()
     user = get_user(user_id)
     if not user:
         user = get_user()
@@ -1654,7 +1667,7 @@ def upload_document():
 
 @app.route('/api/documents/<doc_id>', methods=['GET'])
 def get_document(doc_id):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1681,7 +1694,7 @@ def get_document(doc_id):
 @app.route('/api/documents/<doc_id>', methods=['PUT'])
 def update_document(doc_id):
     data = request.get_json()
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     db = get_db()
     try:
         row = db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
@@ -1714,7 +1727,7 @@ def update_document(doc_id):
 @app.route('/api/documents/bulk-restore', methods=['POST'])
 def bulk_restore_documents():
     data = request.get_json() or {}
-    user_id = data.get('userId')
+    user_id = get_current_user_id()
     doc_ids = data.get('docIds', [])
     user = get_user(user_id)
     
@@ -1746,7 +1759,7 @@ def bulk_restore_documents():
 @app.route('/api/documents/delete-multiple', methods=['DELETE'])
 def delete_multiple_documents():
     data = request.get_json() or {}
-    user_id = data.get('userId')
+    user_id = get_current_user_id()
     doc_ids = data.get('docIds', [])
     user = get_user(user_id)
     
@@ -1794,7 +1807,7 @@ def delete_multiple_documents():
 @app.route('/api/documents/<doc_id>/restore', methods=['POST'])
 def restore_document(doc_id):
     data = request.get_json() or {}
-    user_id = data.get('userId') or request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1816,7 +1829,7 @@ def restore_document(doc_id):
 
 @app.route('/api/documents/<doc_id>', methods=['DELETE'])
 def delete_document(doc_id):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1850,7 +1863,7 @@ def delete_document(doc_id):
 @app.route('/api/documents/<doc_id>/download', methods=['POST'])
 def download_document(doc_id):
     data = request.get_json() or {}
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     db = get_db()
     try:
         row = db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
@@ -1873,7 +1886,7 @@ def download_document(doc_id):
 # ════════════════════════════════════════════════════════════
 @app.route('/api/audit-logs', methods=['GET'])
 def get_audit_logs():
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -1898,26 +1911,67 @@ def get_audit_logs():
 # ════════════════════════════════════════════════════════════
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': '인증이 필요합니다.'}), 401
     user = get_user(user_id)
     today = datetime.now().date().isoformat()
     db = get_db()
     try:
-        total_docs = db.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
-        total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents").fetchone()[0]
-        excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel'").fetchone()[0]
-        image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image'").fetchone()[0]
-        pdf_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='pdf'").fetchone()[0]
-        other_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type IN ('doc','other')").fetchone()[0]
-        today_cnt = db.execute(
-            "SELECT COUNT(*) FROM documents WHERE created_at LIKE ?", (f'{today}%',)
-        ).fetchone()[0]
-        total_dl = db.execute("SELECT COALESCE(SUM(download_count),0) FROM documents").fetchone()[0]
-        user_cnt = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        worker_cnt = db.execute("SELECT COUNT(*) FROM workers").fetchone()[0]
-        proj_cnt = db.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
-        tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs").fetchone()[0]
-        plan_cnt = db.execute("SELECT COUNT(*) FROM work_plans").fetchone()[0]
+        is_admin = (user and user.get('role') == 'admin')
+        
+        if is_admin:
+            # 관리자용: 전체 데이터 
+            total_docs = db.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents").fetchone()[0]
+            excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel'").fetchone()[0]
+            image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image'").fetchone()[0]
+            pdf_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='pdf'").fetchone()[0]
+            other_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type NOT IN ('excel','image','pdf')").fetchone()[0]
+            today_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE created_at LIKE ?", (f'{today}%',)).fetchone()[0]
+            total_dl = db.execute("SELECT COALESCE(SUM(download_count),0) FROM documents").fetchone()[0]
+            
+            user_cnt = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            worker_cnt = db.execute("SELECT COUNT(*) FROM workers").fetchone()[0]
+            proj_cnt = db.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
+            tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs").fetchone()[0]
+            plan_cnt = db.execute("SELECT COUNT(*) FROM workplans").fetchone()[0]
+        else:
+            # 일반 직원용: 본인 데이터 기준 (또는 지정된 예외만)
+            total_docs = db.execute("SELECT COUNT(*) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
+            total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
+            excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel' AND uploader_id=?", (user_id,)).fetchone()[0]
+            image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image' AND uploader_id=?", (user_id,)).fetchone()[0]
+            pdf_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='pdf' AND uploader_id=?", (user_id,)).fetchone()[0]
+            other_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type NOT IN ('excel','image','pdf') AND uploader_id=?", (user_id,)).fetchone()[0]
+            today_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE created_at LIKE ? AND uploader_id=?", (f'{today}%', user_id)).fetchone()[0]
+            total_dl = db.execute("SELECT COALESCE(SUM(download_count),0) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
+            
+            user_cnt = 0 # 일반 직원은 사용자 수를 볼 필요가 없거나 0으로 처리
+            
+            # 여기서 try-except를 쓰는 이유는, 간혹 테이블에 creator_id가 없을 경우를 대비하기 위함입니다 (이전 스크립트 실행 환경 차이).
+            try:
+                worker_cnt = db.execute("SELECT COUNT(*) FROM workers WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                worker_cnt = 0
+                
+            try:
+                tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                tbm_cnt = 0
+                
+            try:
+                plan_cnt = db.execute("SELECT COUNT(*) FROM workplans WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except:
+                plan_cnt = 0
+            
+            assigned = get_user_assigned_project_ids(user_id) or []
+            if len(assigned) == 0:
+                proj_cnt = 0
+            else:
+                placeholders = ','.join('?' * len(assigned))
+                proj_cnt = db.execute(f"SELECT COUNT(*) FROM projects WHERE id IN ({placeholders})", assigned).fetchone()[0]
+
         return jsonify({
             'success': True,
             'stats': {
@@ -1934,6 +1988,61 @@ def get_stats():
 
 
 # ════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════════════════════════
+# 8-1. 대시보드 최근 등록된 글 통합 API
+# ════════════════════════════════════════════════════════════
+@app.route('/api/dashboard/recent', methods=['GET'])
+def get_dashboard_recent():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': '인증이 필요합니다.'}), 401
+    user = get_user(user_id)
+    db = get_db()
+    try:
+        items = []
+        # 1. 공용 예외 (공지, 문서 관리) - 모두에게 노출
+        # (단, 사용자가 명시한 "관리자가 등록한" 조건을 엄격히 적용하여 혼입 방지)
+        notices = db.execute(
+            "SELECT '공지' as type, title, author_name, created_at, file_name, file_path "
+            "FROM notices "
+            "WHERE author_id IN (SELECT id FROM users WHERE role='admin')"
+        ).fetchall()
+        
+        docs = db.execute(
+            "SELECT '문서 관리' as type, title, uploader_name as author_name, created_at, original_file_name as file_name, file_name as file_path "
+            "FROM documents "
+            "WHERE is_deleted=0 AND uploader_role='admin'"
+        ).fetchall()
+        
+        for r in notices + docs:
+            items.append(dict(r))
+            
+        # 2. 각 모듈 데이터 수집
+        queries = [
+            ("TBM", "SELECT 'TBM' as type, work_details_hazards as title, creator_name as author_name, created_at, '' as file_name, image_path as file_path FROM tbm_logs"),
+            ("작업계획서", "SELECT '작업계획서' as type, work_content as title, manager_name as author_name, created_at, '' as file_name, image_path as file_path FROM workplans"),
+            ("작업일보", "SELECT '작업일보' as type, work_content as title, manager_name as author_name, created_at, '' as file_name, image_path as file_path FROM daily_reports"),
+            ("위험성평가", "SELECT '위험성평가' as type, task_name as title, evaluator as author_name, created_at, file_name, file_path FROM risk_assessments")
+        ]
+        
+        for q_type, q_sql in queries:
+            if user and user.get('role') == 'admin':
+                rows = db.execute(q_sql).fetchall()
+            else:
+                rows = db.execute(f"{q_sql} WHERE creator_id=?", (user_id,)).fetchall()
+                
+            for r in rows:
+                items.append(dict(r))
+                
+        # 3. 통합 정렬 (created_at 최신순)
+        items.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        return jsonify({'success': True, 'items': items[:10]})
+    finally:
+        db.close()
+
+
 # 9. 카테고리 목록 API
 # ════════════════════════════════════════════════════════════
 @app.route('/api/categories', methods=['GET'])
@@ -1946,7 +2055,7 @@ def get_categories():
 # ════════════════════════════════════════════════════════════
 @app.route('/api/tbm', methods=['GET'])
 def simple_get_tbm():
-    user_id = request.args.get('userId', '').strip()
+    user_id = get_current_user_id()
     view_as = request.args.get('viewAsUserId', '').strip()
     u = get_user(user_id)
     if u and u.get('role') == 'admin' and view_as:
@@ -1983,7 +2092,7 @@ def simple_get_tbm():
 
 @app.route('/api/tbm', methods=['POST'])
 def simple_create_tbm():
-    user = get_user(request.form.get('userId'))
+    user = get_user(get_current_user_id())
     active_id = request.form.get('projectId') or get_active_project_id() or ''
     
     image_path = ''
@@ -2061,7 +2170,7 @@ def simple_get_tbm_one(tid):
 
 @app.route('/api/tbm/<tid>', methods=['PUT'])
 def simple_update_tbm(tid):
-    user = get_user(request.form.get('userId'))
+    user = get_user(get_current_user_id())
     
     image_path = None
     files = request.files.getlist('files')
@@ -2122,7 +2231,7 @@ def simple_update_tbm(tid):
 
 @app.route('/api/tbm/<tid>', methods=['DELETE'])
 def simple_delete_tbm(tid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -2138,7 +2247,7 @@ def simple_delete_tbm(tid):
 # ════════════════════════════════════════════════════════════
 @app.route('/api/workplans', methods=['GET'])
 def simple_get_workplans():
-    user_id = request.args.get('userId', '').strip()
+    user_id = get_current_user_id()
     view_as = request.args.get('viewAsUserId', '').strip()
     u = get_user(user_id)
     if u and u.get('role') == 'admin' and view_as:
@@ -2175,7 +2284,7 @@ def simple_get_workplans():
 
 @app.route('/api/workplans', methods=['POST'])
 def simple_create_workplan():
-    user = get_user(request.form.get('userId'))
+    user = get_user(get_current_user_id())
     active_id = request.form.get('projectId') or get_active_project_id() or ''
     
     image_path = ''
@@ -2310,7 +2419,7 @@ def get_projects_simple():
     db = get_db()
     try:
         projects = rows_to_list(db.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall())
-        user_id = request.args.get('userId', '').strip()
+        user_id = get_current_user_id()
         view_as = request.args.get('viewAsUserId', '').strip()
         user = get_user(user_id) if user_id else None
         
@@ -2329,7 +2438,7 @@ def get_projects_simple():
 @app.route('/api/projects', methods=['POST'])
 def create_project_simple():
     data = request.get_json() or {}
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     name = (data.get('project_name') or '').strip()
     if not name:
         return jsonify({'error': '공사명을 입력해주세요.'}), 400
@@ -2379,7 +2488,7 @@ def create_project_simple():
 @app.route('/api/projects/<pid>', methods=['PUT'])
 def update_project_simple(pid):
     data = request.get_json() or {}
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     db = get_db()
     try:
         existing = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone())
@@ -2409,7 +2518,7 @@ def update_project_simple(pid):
 @app.route('/api/projects/<pid>/status', methods=['PATCH'])
 def update_project_status(pid):
     data = request.get_json() or {}
-    user = get_user(data.get('userId'))
+    user = get_user(get_current_user_id())
     new_status = data.get('status')
     if not new_status in ['active', 'completed']:
         return jsonify({'error': '유효하지 않은 상태입니다.'}), 400
@@ -2436,7 +2545,7 @@ def update_project_status(pid):
 
 @app.route('/api/projects/<pid>', methods=['DELETE'])
 def delete_project_simple(pid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     db = get_db()
     try:
@@ -2461,7 +2570,7 @@ def get_notices():
 
 @app.route('/api/notices', methods=['POST'])
 def create_notice():
-    user = get_user(request.form.get('userId'))
+    user = get_user(get_current_user_id())
     if not user or user.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
     title = request.form.get('title','').strip()
@@ -2496,7 +2605,7 @@ def create_notice():
 
 @app.route('/api/notices/<nid>', methods=['DELETE'])
 def delete_notice(nid):
-    user_id = request.args.get('userId')
+    user_id = get_current_user_id()
     user = get_user(user_id)
     if not user or user.get('role') != 'admin':
         return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
@@ -2518,7 +2627,7 @@ def delete_notice(nid):
 # ── RISK ASSESSMENTS API ──────────────────────────────────────
 @app.route('/api/risk-assessments', methods=['GET'])
 def get_risk_assessments():
-    user_id = request.args.get('userId', '').strip()
+    user_id = get_current_user_id()
     project_id = request.args.get('projectId', 'all')
     db = get_db()
     try:
@@ -2680,7 +2789,7 @@ def delete_risk_assessment(rid):
 # ════════════════════════════════════════════════════════════
 @app.route('/api/daily-reports', methods=['GET'])
 def get_daily_reports():
-    user_id = request.args.get('userId', '').strip()
+    user_id = get_current_user_id()
     view_as = request.args.get('viewAsUserId', '').strip()
     u = get_user(user_id)
     if u and u.get('role') == 'admin' and view_as:
@@ -2717,7 +2826,7 @@ def get_daily_reports():
 
 @app.route('/api/daily-reports', methods=['POST'])
 def create_daily_report():
-    user = get_user(request.form.get('userId'))
+    user = get_user(get_current_user_id())
     active_id = request.form.get('projectId') or get_active_project_id() or ''
     
     image_path = ''
@@ -2767,7 +2876,7 @@ def create_daily_report():
 
 @app.route('/api/daily-reports/<did>', methods=['PUT'])
 def update_daily_report(did):
-    user = get_user(request.form.get('userId'))
+    user = get_user(get_current_user_id())
     
     image_path = ''
     files = request.files.getlist('files')

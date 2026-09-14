@@ -898,7 +898,6 @@
           <!-- ── DASHBOARD ── -->
           <div class="page active" id="page-dashboard">
             <div class="section-title">📊 대시보드</div>
-            <div class="section-desc" id="proj-name-label">현재 프로젝트를 불러오는 중...</div>
             <div class="grid-3" style="margin-bottom:20px;" id="stat-cards">
               <div class="stat-card stat-blue">
                 <div class="stat-value" id="stat-docs">-</div>
@@ -1766,7 +1765,12 @@
     }
 
     async function api(url, opts = {}) {
-      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', ...opts });
+      if (res.status === 401 || res.status === 403) {
+        toast('세션이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.', 'error');
+        doLogout();
+        throw new Error('Unauthorized');
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '오류가 발생했습니다.');
       return data;
@@ -1872,7 +1876,10 @@
       } catch (e) { toast(e.message, 'error'); }
     }
 
-    function doLogout() {
+    async function doLogout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch (e) { console.error('Logout error', e); }
       currentUser = null;
       document.getElementById('app').style.display = 'none';
       document.getElementById('login-screen').style.display = 'flex';
@@ -2113,28 +2120,25 @@
     // ── Dashboard ─────────────────────────────────────────────
     async function loadDashboard() {
       try {
-        const [statsData, noticesData, projData] = await Promise.all([
-          api(`/api/stats?userId=${currentUser?.id || ''}`).catch(() => ({})),
-          api('/api/notices').catch(() => ({})),
+        const [statsData, recentData, projData] = await Promise.all([
+          api(`/api/stats`).catch(() => ({})),
+          api('/api/dashboard/recent').catch(() => ({})),
           api('/api/project-info').catch(() => ({}))
         ]);
-        if (projData.projectInfo) {
-          document.getElementById('proj-name-label').textContent = projData.projectInfo.project_name || '공사명 미등록';
-        }
         const s = statsData.stats || {};
         document.getElementById('stat-docs').textContent = s.totalDocuments ?? '-';
         document.getElementById('stat-workers').textContent = s.workerCount ?? '-';
         document.getElementById('stat-tbm').textContent = s.tbmCount ?? '-';
         document.getElementById('stat-workplans').textContent = s.workPlanCount ?? '-';
         
-        const notices = (noticesData.notices || []).slice(0, 10);
+        const items = (recentData.items || []).slice(0, 10);
         const tbody = document.getElementById('dash-notice-tbody');
-        if (!notices.length) { tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>최근 등록된 글이 없습니다.</p></div></td></tr>`; return; }
-        tbody.innerHTML = notices.map(n => `<tr>
-      <td class="fw-600">${esc(n.title)}</td>
+        if (!items.length) { tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>최근 등록된 글이 없습니다.</p></div></td></tr>`; return; }
+        tbody.innerHTML = items.map(n => `<tr>
+      <td class="fw-600"><span style="color:var(--accent); margin-right:4px;">[${esc(n.type)}]</span>${esc(n.title)}</td>
       <td class="td-muted">${fmtAuthor(n.author_name)}</td>
       <td class="td-muted" style="white-space:nowrap;">${fmtDate(n.created_at)}</td>
-      <td>${n.file_name ? `<a href="/uploads/${encodeURIComponent(n.file_path)}" target="_blank" style="color:var(--accent);font-size:13px;">📎 다운로드</a>` : '-'}</td>
+      <td>${n.file_path ? `<a href="/uploads/${encodeURIComponent(n.file_path)}" target="_blank" style="color:var(--accent);font-size:13px;">📎 다운로드</a>` : '-'}</td>
     </tr>`).join('');
       } catch (e) { }
     }
