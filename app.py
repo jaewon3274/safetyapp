@@ -1023,9 +1023,11 @@ def create_worker():
         return jsonify({'error': '이름을 입력해주세요.'}), 400
         
     image_path = ''
+    original_filename = ''
     if 'file' in request.files:
         f = request.files['file']
         if f and f.filename:
+            original_filename = f.filename
             ext = os.path.splitext(f.filename)[1] or '.jpg'
             unique_name = f"wrk_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
@@ -1040,21 +1042,27 @@ def create_worker():
         wid = new_id('wrk')
         n = now_iso()
         site_name = site_name_input or (active_proj['project_name'] if active_proj else '')
-        # creator_id 컬럼 반영
+        # creator_id 및 image_path 컬럼 반영
         cols = {row[1] for row in db.execute("PRAGMA table_info(workers)").fetchall()}
         if 'creator_id' not in cols:
             db.execute("ALTER TABLE workers ADD COLUMN creator_id TEXT DEFAULT ''")
             db.commit()
+        if 'image_path' not in cols:
+            db.execute("ALTER TABLE workers ADD COLUMN image_path TEXT DEFAULT ''")
+            db.commit()
+        if 'original_filename' not in cols:
+            db.execute("ALTER TABLE workers ADD COLUMN original_filename TEXT DEFAULT ''")
+            db.commit()
 
         db.execute(
-            "INSERT INTO workers (id, project_id, name, birth_date, gender, nationality, contact, job_type, site_name, created_at, updated_at, hire_date, notes, creator_id, image_path) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO workers (id, project_id, name, birth_date, gender, nationality, contact, job_type, site_name, created_at, updated_at, hire_date, notes, creator_id, image_path, original_filename) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (wid, project_id_input or active_id,
              name, '',        # birth_date
              '남',            # gender
              nationality,
              '',              # contact
              job_type, site_name, n, n,
-             hire_date, notes, user['id'] if user else '', image_path)
+             hire_date, notes, user['id'] if user else '', image_path, original_filename)
         )
         db.commit()
         worker = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
@@ -1104,10 +1112,21 @@ def update_worker(wid):
         if not worker:
             return jsonify({'error': '근로자 정보를 찾을 수 없습니다.'}), 404
             
+        if user and user['role'] != 'admin' and worker.get('creator_id') != user['id']:
+            return jsonify({'error': '권한이 없습니다.'}), 403
+            
         image_path = worker.get('image_path', '')
+        original_filename = worker.get('original_filename', '')
+        delete_file = request.form.get('delete_file', 'false') == 'true'
+        
+        if delete_file:
+            image_path = ''
+            original_filename = ''
+
         if 'file' in request.files:
             f = request.files['file']
             if f and f.filename:
+                original_filename = f.filename
                 ext = os.path.splitext(f.filename)[1] or '.jpg'
                 unique_name = f"wrk_{new_id('img')}{ext}"
                 save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
@@ -1121,9 +1140,18 @@ def update_worker(wid):
         hire_date = hire_date_input or worker.get('hire_date','')
         notes = notes_input if notes_input is not None else worker.get('notes','')
         
+        # image_path 및 original_filename 컬럼 반영
+        cols = {row[1] for row in db.execute("PRAGMA table_info(workers)").fetchall()}
+        if 'image_path' not in cols:
+            db.execute("ALTER TABLE workers ADD COLUMN image_path TEXT DEFAULT ''")
+            db.commit()
+        if 'original_filename' not in cols:
+            db.execute("ALTER TABLE workers ADD COLUMN original_filename TEXT DEFAULT ''")
+            db.commit()
+
         db.execute(
-            """UPDATE workers SET name=?, nationality=?, job_type=?, hire_date=?, notes=?, image_path=?, updated_at=? WHERE id=?""",
-            (name, nationality, job_type, hire_date, notes, image_path, now_iso(), wid)
+            """UPDATE workers SET name=?, nationality=?, job_type=?, hire_date=?, notes=?, image_path=?, original_filename=?, updated_at=? WHERE id=?""",
+            (name, nationality, job_type, hire_date, notes, image_path, original_filename, now_iso(), wid)
         )
         db.commit()
         updated = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
@@ -1131,6 +1159,30 @@ def update_worker(wid):
                       user['role'] if user else '', 'EDIT',
                       f"근로자 이력 수정: [성명: {name}, 직종: {job_type}]")
         return jsonify({'success': True, 'worker': updated})
+    finally:
+        db.close()
+
+
+@app.route('/api/workers/download/<wid>', methods=['GET'])
+def download_worker_file(wid):
+    user_id = request.args.get('userId')
+    user = get_user(user_id)
+    if not user:
+        user = get_user()
+    db = get_db()
+    try:
+        worker = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
+        if not worker or not worker.get('image_path'):
+            return jsonify({'error': '첨부파일이 존재하지 않습니다.'}), 404
+        
+        file_path = worker['image_path']
+        original_name = worker.get('original_filename') or file_path
+        
+        # 안전한 파일 전송
+        try:
+            return send_from_directory(app.config['UPLOAD_FOLDER'], file_path, as_attachment=True, download_name=original_name)
+        except Exception as e:
+            return jsonify({'error': '파일을 읽을 수 없습니다.', 'details': str(e)}), 500
     finally:
         db.close()
 
@@ -1144,6 +1196,9 @@ def delete_worker(wid):
         worker = row_to_dict(db.execute("SELECT * FROM workers WHERE id=?", (wid,)).fetchone())
         if not worker:
             return jsonify({'error': '근로자 정보를 찾을 수 없습니다.'}), 404
+            
+        if user and user['role'] != 'admin' and worker.get('creator_id') != user['id']:
+            return jsonify({'error': '권한이 없습니다.'}), 403
         db.execute("DELETE FROM workers WHERE id=?", (wid,))
         db.commit()
         add_audit_log(user['id'] if user else '', user['name'] if user else '',
@@ -2030,18 +2085,19 @@ def simple_update_tbm(tid):
                 except Exception:
                     pass
             saved.append(unique_name)
-    if saved:
-        # 기존 이미지에 추가
-        db_tmp = get_db()
-        try:
-            old = row_to_dict(db_tmp.execute("SELECT image_path FROM tbm_logs WHERE id=?", (tid,)).fetchone())
-            old_imgs = (old or {}).get('image_path', '')
-            if old_imgs:
-                image_path = old_imgs + ',' + ','.join(saved)
-            else:
-                image_path = ','.join(saved)
-        finally:
-            db_tmp.close()
+            
+    deleted_files = [f.strip() for f in request.form.get('deleted_files', '').split(',') if f.strip()]
+    db_tmp = get_db()
+    try:
+        old = row_to_dict(db_tmp.execute("SELECT image_path FROM tbm_logs WHERE id=?", (tid,)).fetchone())
+        old_imgs = (old or {}).get('image_path', '')
+        final_old_imgs = [img for img in old_imgs.split(',') if img and img not in deleted_files]
+        if saved or final_old_imgs:
+            image_path = ','.join(final_old_imgs + saved)
+        else:
+            image_path = ''
+    finally:
+        db_tmp.close()
 
     db = get_db()
     try:
@@ -2545,6 +2601,64 @@ def create_risk_assessment():
         return jsonify({'success': True, 'message': '위험성평가가 등록되었습니다.', 'id': rid})
     except Exception as e:
         print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/risk-assessments/<rid>', methods=['PUT'])
+def update_risk_assessment(rid):
+    db = get_db()
+    try:
+        row = db.execute("SELECT * FROM risk_assessments WHERE id = ?", (rid,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Not found'}), 404
+            
+        project_id = request.form.get('projectId', row['project_id'])
+        eval_date  = request.form.get('evalDate', row['eval_date'])
+        task_name  = request.form.get('taskName', row['task_name'])
+        evaluator  = request.form.get('evaluator', row['evaluator'])
+        content    = request.form.get('content', row['content'])
+        
+        current_file_path = row['file_path'] or ''
+        current_file_name = row['file_name'] or ''
+        
+        deleted_files = request.form.get('deleted_files', '').split(',')
+        deleted_files = [f.strip() for f in deleted_files if f.strip()]
+        
+        if current_file_path and current_file_path in deleted_files:
+            try:
+                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], current_file_path))
+            except:
+                pass
+            current_file_path = ''
+            current_file_name = ''
+            
+        if 'file' in request.files:
+            f = request.files['file']
+            if f and f.filename:
+                if current_file_path:
+                    try:
+                        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], current_file_path))
+                    except:
+                        pass
+                current_file_name = f.filename
+                safe_name = secure_filename(f.filename)
+                unique_name = f"{new_id('riskimg')}_{safe_name}"
+                save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                f.save(save_path)
+                current_file_path = unique_name
+                
+        db.execute("""
+            UPDATE risk_assessments 
+            SET project_id=?, eval_date=?, task_name=?, evaluator=?, content=?, file_path=?, file_name=?
+            WHERE id=?
+        """, (project_id, eval_date, task_name, evaluator, content, current_file_path, current_file_name, rid))
+        db.commit()
+        
+        return jsonify({'success': True, 'message': '위험성평가가 수정되었습니다.'})
+    except Exception as e:
+        print(f'[Error updating risk assessment]: {e}')
         return jsonify({'error': str(e)}), 500
     finally:
         db.close()

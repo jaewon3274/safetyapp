@@ -768,6 +768,16 @@
       display: block;
     }
   </style>
+  <style>
+    .file-preview-item {
+      display: inline-flex; align-items: center; background: var(--bg-hover);
+      padding: 6px 12px; border-radius: 8px; margin: 4px; border: 1px solid var(--border);
+    }
+    .file-preview-item img { max-width: 40px; max-height: 40px; border-radius: 4px; margin-right: 8px; cursor:pointer;}
+    .file-preview-item span { font-size: 0.9rem; color: var(--text); flex-grow: 1; margin-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width:150px; }
+    .file-preview-item button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding:0 4px; }
+    .file-preview-item button:hover { opacity: 0.7; }
+  </style>
 </head>
 
 <body>
@@ -1007,6 +1017,7 @@
                       <th>직종</th>
                       <th>국적</th>
                       <th>입사일</th>
+                      <th>첨부파일</th>
                       <th>관리</th>
                     </tr>
                   </thead>
@@ -1046,12 +1057,13 @@
                       <th>작업 내용</th>
                       <th>담당자</th>
                       <th>상태</th>
+                      <th>첨부파일</th>
                       <th>관리</th>
                     </tr>
                   </thead>
                   <tbody id="wp-tbody">
                     <tr>
-                      <td colspan="5">
+                      <td colspan="6">
                         <div class="loading">
                           <div class="spinner"></div>
                         </div>
@@ -1085,7 +1097,7 @@
                       <th>일자</th>
                       <th>작업 내용</th>
                       <th>담당자</th>
-                      <th>사진</th>
+                      <th>첨부파일</th>
                       <th>관리</th>
                     </tr>
                   </thead>
@@ -1125,12 +1137,13 @@
                       <th>작업 내용 및 위험 요소</th>
                       <th>안전 조치 사항</th>
                       <th>작성자</th>
+                      <th>첨부파일</th>
                       <th>관리</th>
                     </tr>
                   </thead>
                   <tbody id="tbm-tbody">
                     <tr>
-                      <td colspan="5">
+                      <td colspan="6">
                         <div class="loading">
                           <div class="spinner"></div>
                         </div>
@@ -1164,12 +1177,13 @@
                       <th>작업명</th>
                       <th>평가자</th>
                       <th>등록일시</th>
+                      <th>첨부파일</th>
                       <th>관리</th>
                     </tr>
                   </thead>
                   <tbody id="risk-tbody">
                     <tr>
-                      <td colspan="5">
+                      <td colspan="6">
                         <div class="loading">
                           <div class="spinner"></div>
                         </div>
@@ -1436,6 +1450,7 @@
         <div class="form-group"><label>입사일</label><input class="form-control" type="date" id="w-hire" min="1900-01-01" max="9999-12-31"></div>
       </div>
       <div class="form-group"><label>특이사항</label><textarea class="form-control" id="w-note" rows="2"></textarea></div>
+      <div class="form-group"><label>첨부파일 (신분증, 이력서 등)</label><div id="w-file-preview" style="margin-bottom:8px;"></div><input class="form-control" type="file" id="w-file"></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-worker')">취소</button>
         <button class="btn btn-primary" onclick="saveWorker()">저장</button>
@@ -1461,7 +1476,8 @@
 
       <div class="form-group" style="grid-column:1/-1;">
         <label>사진 (여러 장 선택 가능)</label>
-        <input class="form-control" type="file" id="daily-photo" accept="image/*" multiple>
+        <div id="daily-photo-preview" style="margin-bottom:8px;"></div>
+        <input class="form-control" type="file" id="daily-photo" multiple>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-daily')">취소</button>
@@ -1488,7 +1504,7 @@
           placeholder="안전 조치 사항을 입력하세요"></textarea></div>
       <div class="form-group"><label>특이사항</label><textarea class="form-control" id="tbm-notes" rows="2"></textarea>
       </div>
-      <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 추가 (여러 장 선택 가능)</label><input class="form-control" type="file" id="tbm-photo" accept="image/*" multiple></div>
+      <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 첨부 (여러 장 선택 가능)</label><div id="tbm-photo-preview" style="margin-bottom:8px;"></div><input class="form-control" type="file" id="tbm-photo" multiple></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-tbm')">취소</button>
         <button class="btn btn-primary" onclick="saveTbm()">저장</button>
@@ -1512,7 +1528,7 @@
       </div>
       <div class="form-group"><label>담당자</label><input class="form-control" id="wp-manager" placeholder="담당자명"></div>
       
-      <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 추가 (여러 장 선택 가능)</label><input class="form-control" type="file" id="wp-photo" accept="image/*" multiple></div>
+      <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 첨부 (여러 장 선택 가능)</label><div id="wp-photo-preview" style="margin-bottom:8px;"></div><input class="form-control" type="file" id="wp-photo" multiple></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-wp')">취소</button>
         <button class="btn btn-primary" onclick="saveWorkplan()">저장</button>
@@ -1531,8 +1547,7 @@
       <div class="form-group"><label>내용</label><textarea class="form-control" id="notice-content" rows="5" placeholder="공지 내용을 입력하세요"></textarea></div>
       <div class="form-group">
         <label>파일 첨부 (엑셀, 워드, PDF, PPT 등)</label>
-        <input class="form-control" type="file" id="notice-file"
-          accept=".xlsx,.xls,.doc,.docx,.pdf,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg">
+        <input class="form-control" type="file" id="notice-file">
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-notice')">취소</button>
@@ -1578,7 +1593,7 @@
   <div class="modal-overlay" id="modal-add-risk">
     <div class="modal" style="max-width:600px;">
       <div class="modal-header">
-        <div class="modal-title">⚠️ 위험성평가 등록</div>
+        <div class="modal-title" id="risk-modal-title">⚠️ 위험성평가 등록</div>
         <button class="modal-close" onclick="closeModal('modal-add-risk')">✕</button>
       </div>
       <div class="form-group"><label>현장 <span style="color:#f85149">* (필수)</span></label>
@@ -1595,6 +1610,7 @@
       <div class="form-group"><label>내용 및 위험성 감소 대책 <span style="color:#f85149">* (필수)</span></label>
         <textarea class="form-control" id="risk-content" rows="4" placeholder="내용을 입력하세요"></textarea></div>
       <div class="form-group"><label>관련 파일 첨부 (선택)</label>
+        <div id="risk-file-preview" style="margin-bottom:8px;"></div>
         <input type="file" class="form-control" id="risk-file"></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-add-risk')">취소</button>
@@ -1637,6 +1653,70 @@
 
   <!-- ════════ SCRIPT ════════ -->
   <script>
+    // === File Editing Globals ===
+    var workerDeleteFile = false;
+    var tbmDeletedFiles = [];
+    var dailyDeletedFiles = [];
+    var wpDeletedFiles = [];
+    var riskDeletedFiles = [];
+    
+    function renderFileBadge(file, originalName, asLink = false, downloadUrl = null) {
+      if (!file) return '-';
+      const lowerFile = file.toLowerCase();
+      const lowerName = (originalName || '').toLowerCase();
+      
+      const isImg = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].some(ext => lowerFile.endsWith(ext) || lowerName.endsWith(ext));
+      const isPdf = lowerFile.endsWith('.pdf') || lowerName.endsWith('.pdf');
+      
+      const name = originalName || file;
+      const url = downloadUrl || `/uploads/${encodeURIComponent(file)}/download`;
+      
+      if (isImg) {
+        return `<img src="/uploads/${encodeURIComponent(file)}" alt="첨부 사진" style="max-width:50px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(file)}')"/>`;
+      } else if (isPdf) {
+        const badge = `<span style="background:#e3242b;color:white;font-weight:bold;font-size:11px;padding:3px 6px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;"><svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M4 0h5.293A1 1 0 0 1 10 .293L13.707 4a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zm5.5 1.5v2a1 1 0 0 0 1 1h2l-3-3zM4.5 3a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7z"/></svg> PDF</span>`;
+        if (asLink) return `<a href="${url}" target="_blank" style="text-decoration:none;" title="${name}">${badge}</a>`;
+        return badge;
+      } else {
+        const badge = `<span style="background:var(--bg-hover);color:var(--text);font-size:12px;padding:3px 6px;border-radius:4px;display:inline-flex;align-items:center;border:1px solid var(--border);">📎 ${name}</span>`;
+        if (asLink) return `<a href="${url}" target="_blank" style="text-decoration:none;" title="${name}">${badge}</a>`;
+        return badge;
+      }
+    }
+    
+    function renderFilePreview(containerId, filePath, originalName, arrayRef, isSingle) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      if (!filePath) { container.innerHTML = ''; return; }
+      
+      const files = isSingle ? [filePath] : filePath.split(',').filter(x => x);
+      let html = '';
+      files.forEach(file => {
+        const name = isSingle ? (originalName || file) : file;
+        let media = renderFileBadge(file, name, false);
+          
+        html += `
+          <div class="file-preview-item" id="preview-${file}">
+            ${media}
+            <span title="${name}">${name}</span>
+            <button type="button" onclick="removeFilePreview('${containerId}', '${file}', '${arrayRef}', ${isSingle})" title="삭제">✕</button>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+    
+    window.removeFilePreview = function(containerId, file, arrayRef, isSingle) {
+      if (isSingle) {
+        window[arrayRef] = true;
+        document.getElementById(containerId).innerHTML = '';
+      } else {
+        window[arrayRef].push(file);
+        const el = document.getElementById('preview-' + file);
+        if (el) el.remove();
+      }
+    };
+
     // 테마 초기화
     if (localStorage.getItem('theme') === 'light') {
       document.documentElement.classList.add('light-theme');
@@ -2185,24 +2265,35 @@
         const projId = document.getElementById('filter-workers-project')?.value || 'all';
         const url = viewAs ? `/api/workers?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}&projectId=${projId}` : `/api/workers?userId=${currentUser?.id || ''}&projectId=${projId}`;
         const data = await api(url);
-        const list = data.workers || [];
-        const tbody = document.getElementById('workers-tbody');
-        const canEdit = currentUser?.role === 'admin';
-        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👷</div><p>등록된 근로자가 없습니다.</p></div></td></tr>`; return; }
-        tbody.innerHTML = list.map(w => `<tr>
-      <td class="fw-600">${esc(w.name)}</td>
-      <td class="td-muted">${esc(w.job_type) || '-'}</td>
-      <td class="td-muted">${esc(w.nationality) || '-'}</td>
-      <td class="td-muted">${esc(w.hire_date) || '-'}</td>
-      <td>${canEdit ? `<div class="td-actions"><button class="btn btn-secondary btn-sm" onclick="openWorkerModal('${w.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="delWorker('${w.id}','${esc(w.name)}')">🗑️</button></div>` : '-'}</td>
-    </tr>`).join('');
+      const list = data.workers || [];
+      const tbody = document.getElementById('workers-tbody');
+      const isAdmin = currentUser?.role === 'admin';
+      if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">👷</div><p>등록된 근로자가 없습니다.</p></div></td></tr>`; return; }
+      tbody.innerHTML = list.map(w => {
+        const canEdit = isAdmin || (w.creator_id && w.creator_id === currentUser?.id);
+        return `<tr>
+          <td class="fw-600">${esc(w.name)}</td>
+          <td class="td-muted">${esc(w.job_type) || '-'}</td>
+          <td class="td-muted">${esc(w.nationality) || '-'}</td>
+          <td class="td-muted">${esc(w.hire_date) || '-'}</td>
+          <td class="td-muted">
+            ${(() => {
+              if (!w.image_path) return '-';
+              return renderFileBadge(w.image_path, w.original_filename, true, `/api/workers/download/${w.id}`);
+            })()}
+          </td>
+          <td>${canEdit ? `<div class="td-actions"><button class="btn btn-secondary btn-sm" onclick="openWorkerModal('${w.id}')">✏️ 수정</button><button class="btn btn-danger btn-sm" onclick="delWorker('${w.id}','${esc(w.name)}')">🗑️ 삭제</button></div>` : '-'}</td>
+        </tr>`;
+      }).join('');
       } catch (e) { toast('근로자 로딩 실패: ' + e.message, 'error'); }
     }
     async function openWorkerModal(id) {
       await loadProjectDropdowns();
       editingWorkerId = id;
       document.getElementById('worker-modal-title').textContent = id ? '근로자 수정' : '근로자 추가';
-      ['w-name', 'w-job', 'w-nation', 'w-hire', 'w-note'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+      ['w-name', 'w-job', 'w-nation', 'w-hire', 'w-note', 'w-file'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+      workerDeleteFile = false;
+      document.getElementById('w-file-preview').innerHTML = '';
       if (id) {
         api(`/api/workers/${id}?userId=${currentUser?.id}`).then(data => {
           const w = data.worker;
@@ -2211,28 +2302,41 @@
           document.getElementById('w-nation').value = w.nationality || '';
           document.getElementById('w-hire').value = w.hire_date || '';
           document.getElementById('w-note').value = w.notes || '';
+          if(w.image_path) renderFilePreview('w-file-preview', w.image_path, w.original_filename, 'workerDeleteFile', true);
         }).catch(e => toast(e.message, 'error'));
       }
       openModal('modal-worker');
     }
     async function saveWorker() {
-      const body = {
-        userId: currentUser?.id,
-        project_id: document.getElementById('worker-project').value,
-        name: document.getElementById('w-name').value.trim(),
-        job_type: document.getElementById('w-job').value.trim(),
-        nationality: document.getElementById('w-nation').value.trim(),
-        hire_date: document.getElementById('w-hire').value,
-        notes: document.getElementById('w-note').value.trim(),
-      };
-      if (!body.name) { toast('이름을 입력하세요.', 'error'); return; }
+      const name = document.getElementById('w-name').value.trim();
+      const projId = document.getElementById('worker-project').value;
+      if (!name) { toast('이름을 입력하세요.', 'error'); return; }
       try {
+        const fd = new FormData();
+        fd.append('userId', currentUser?.id || '');
+        fd.append('projectId', projId);
+        fd.append('name', name);
+        fd.append('job_type', document.getElementById('w-job').value.trim());
+        fd.append('nationality', document.getElementById('w-nation').value.trim());
+        fd.append('hire_date', document.getElementById('w-hire').value);
+        fd.append('notes', document.getElementById('w-note').value.trim());
+        fd.append('delete_file', workerDeleteFile ? 'true' : 'false');
+        
+        const fileInput = document.getElementById('w-file');
+        if (fileInput && fileInput.files[0]) {
+          fd.append('file', fileInput.files[0]);
+        }
+        
         const method = editingWorkerId ? 'PUT' : 'POST';
         const url = editingWorkerId ? `/api/workers/${editingWorkerId}` : '/api/workers';
-        await api(url, { method, body: JSON.stringify(body) });
+        
+        const res = await fetch(url, { method, body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '저장 실패');
+        
         toast(editingWorkerId ? '수정되었습니다.' : '등록되었습니다.', 'success');
         closeModal('modal-worker'); loadWorkers();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { console.error(e); toast(e.message, 'error'); }
     }
     function delWorker(id, name) {
       confirm2('근로자 삭제', `"${name}" 근로자 정보를 삭제하시겠습니까?`, async () => {
@@ -2265,15 +2369,14 @@
             <td>${esc((d.work_content || '').slice(0, 80))}</td>
             <td class="td-muted">${fmtAuthor(d.manager_name)}</td>
             <td>
-              ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
+              ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">` + imgs.map(img => `
                 <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
-                  <img src="/uploads/${encodeURIComponent(img.trim())}" alt="작업 사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
-                  <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
-                </div>`).join('') + `</div>` : ''}
+                  ${renderFileBadge(img.trim(), img.trim(), true)}
+                </div>`).join('') + `</div>` : '-'}
             </td>
             <td>
               <div class="td-actions" style="display:inline-flex;">
-                <button class="btn btn-secondary btn-sm" onclick="openDailyModal('${d.id}', '${esc(d.project_id)}', '${esc(d.work_date)}', '${esc(d.work_content)}', '${esc(d.manager_name)}', '${esc(d.status)}')">✏️</button>
+                <button class="btn btn-secondary btn-sm" onclick="openDailyModal('${d.id}', '${esc(d.project_id)}', '${esc(d.work_date)}', '${esc(d.work_content)}', '${esc(d.manager_name)}', '${esc(d.status)}', '${encodeURIComponent(d.image_path || '')}')">✏️</button>
                 <button class="btn btn-danger btn-sm" onclick="delDailyReport('${d.id}')">🗑️</button>
               </div>
             </td>
@@ -2282,7 +2385,7 @@
       } catch (e) { toast('작업일보 로딩 실패: ' + e.message, 'error'); }
     }
     
-    async function openDailyModal(id, pId, date, content, manager, status) {
+    async function openDailyModal(id, pId, date, content, manager, status, imgPathEncoded) {
       await loadProjectDropdowns();
       editingDailyId = id;
       document.getElementById('daily-modal-title').textContent = id ? '작업일보 수정' : '작업일보 추가';
@@ -2298,6 +2401,13 @@
       document.getElementById('daily-content').value = content || '';
       document.getElementById('daily-manager').value = manager || '';
       document.getElementById('daily-photo').value = '';
+      
+      dailyDeletedFiles = [];
+      document.getElementById('daily-photo-preview').innerHTML = '';
+      if (id && imgPathEncoded) {
+        const imgPath = decodeURIComponent(imgPathEncoded);
+        if (imgPath) renderFilePreview('daily-photo-preview', imgPath, '', 'dailyDeletedFiles', false);
+      }
       
       openModal('modal-daily');
     }
@@ -2317,8 +2427,7 @@
         fd.append('work_date', date);
         fd.append('work_content', content);
         fd.append('manager_name', manager);
-        
-        fd.append('projectId', projId);
+        fd.append('deleted_files', dailyDeletedFiles.join(','));
         fd.append('userId', currentUser?.id || '');
         
         const photoInput = document.getElementById('daily-photo');
@@ -2370,11 +2479,12 @@
       <td style="max-width:200px;">${esc((t.safety_measures || '').slice(0, 60))}${(t.safety_measures || '').length > 60 ? '...' : ''}</td>
       <td class="td-muted">${fmtAuthor(t.creator_name)}</td>
       <td>
-        ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
+        ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">` + imgs.map(img => `
           <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
-            <img src="/uploads/${encodeURIComponent(img.trim())}" alt="TBM 사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
-            <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
-          </div>`).join('') + `</div>` : ''}
+            ${renderFileBadge(img.trim(), img.trim(), true)}
+          </div>`).join('') + `</div>` : '-'}
+      </td>
+      <td>
         <div class="td-actions" style="display:inline-flex;"><button class="btn btn-secondary btn-sm" onclick="openTbmModal('${t.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="delTbm('${t.id}')">🗑️</button></div>
       </td>
     </tr>`;
@@ -2387,6 +2497,8 @@
       document.getElementById('tbm-modal-title').textContent = id ? 'TBM 수정' : 'TBM 작성';
       ['tbm-date', 'tbm-hazards', 'tbm-measures', 'tbm-notes'].forEach(i => document.getElementById(i).value = '');
       document.getElementById('tbm-date').value = new Date().toISOString().slice(0, 10);
+      tbmDeletedFiles = [];
+      document.getElementById('tbm-photo-preview').innerHTML = '';
       if (id) {
         api(`/api/tbm/${id}?userId=${currentUser?.id}`).then(data => {
           const t = data.tbm_log;
@@ -2394,6 +2506,7 @@
           document.getElementById('tbm-hazards').value = t.work_details_hazards || '';
           document.getElementById('tbm-measures').value = t.safety_measures || '';
           document.getElementById('tbm-notes').value = t.special_notes || '';
+          if(t.image_path) renderFilePreview('tbm-photo-preview', t.image_path, '', 'tbmDeletedFiles', false);
         }).catch(e => toast(e.message, 'error'));
       }
       openModal('modal-tbm');
@@ -2413,6 +2526,7 @@
         fd.append('work_details_hazards', hazards);
         fd.append('safety_measures', measures);
         fd.append('special_notes', notes);
+        fd.append('deleted_files', tbmDeletedFiles.join(','));
         fd.append('creator_name', currentUser?.name || '');
         
         const photoInput = document.getElementById('tbm-photo');
@@ -2454,16 +2568,18 @@
       <td>
         <div style="font-weight:bold;margin-bottom:4px;">${esc(r.task_name)}</div>
         <div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;">${esc(r.content)}</div>
-        ${r.file_path ? `
-          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin-top:8px;">
-            <img src="/uploads/${encodeURIComponent(r.file_path)}" alt="위험성평가 사진" style="max-width:80px;max-height:80px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(r.file_path)}')"/>
-            <a href="/uploads/${encodeURIComponent(r.file_path)}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️ ${esc(r.file_name || '다운로드')}</a>
-          </div>` : ''}
       </td>
       <td class="td-muted">${esc(r.evaluator)}</td>
       <td class="td-muted">${fmtDate(r.created_at)}</td>
       <td>
+        ${r.file_path ? `
+          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
+            ${renderFileBadge(r.file_path, r.file_name, true)}
+          </div>` : '-'}
+      </td>
+      <td>
         <div class="td-actions" style="display:inline-flex;">
+          <button class="btn btn-secondary btn-sm" onclick="openRiskModal('${r.id}')">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="delRisk('${r.id}')">🗑️</button>
         </div>
       </td>
@@ -2472,12 +2588,31 @@
       } catch (e) { toast('위험성평가 로딩 실패: ' + e.message, 'error'); }
     }
     
-    async function openRiskModal() {
+    let editingRiskId = null;
+    
+    async function openRiskModal(id) {
       await loadProjectDropdowns();
+      editingRiskId = id;
+      document.getElementById('risk-modal-title').textContent = id ? '위험성평가 수정' : '위험성평가 추가';
       ['risk-date', 'risk-evaluator', 'risk-task', 'risk-content', 'risk-file'].forEach(i => document.getElementById(i).value = '');
       document.getElementById('risk-date').value = new Date().toISOString().slice(0, 10);
       
-
+      riskDeletedFiles = [];
+      document.getElementById('risk-file-preview').innerHTML = '';
+      
+      if (id) {
+        api(`/api/risk-assessments?userId=${currentUser?.id || ''}&projectId=all`).then(data => {
+          const list = data.risk_assessments || [];
+          const r = list.find(x => x.id === id);
+          if (r) {
+            document.getElementById('risk-date').value = r.eval_date || '';
+            document.getElementById('risk-evaluator').value = r.evaluator || '';
+            document.getElementById('risk-task').value = r.task_name || '';
+            document.getElementById('risk-content').value = r.content || '';
+            if (r.file_path) renderFilePreview('risk-file-preview', r.file_path, r.file_name, 'riskDeletedFiles', true);
+          }
+        }).catch(e => toast(e.message, 'error'));
+      }
       
       openModal('modal-add-risk');
     }
@@ -2502,16 +2637,19 @@
         fd.append('content', content);
         fd.append('projectId', projId);
         fd.append('userId', currentUser?.id || '');
+        fd.append('deleted_files', riskDeletedFiles.join(','));
         
         if (fileInput && fileInput.files && fileInput.files[0]) {
           fd.append('file', fileInput.files[0]);
         }
         
-        const res = await fetch('/api/risk-assessments', { method: 'POST', body: fd });
+        const method = editingRiskId ? 'PUT' : 'POST';
+        const url = editingRiskId ? `/api/risk-assessments/${editingRiskId}` : '/api/risk-assessments';
+        const res = await fetch(url, { method, body: fd });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '등록 실패');
         
-        toast(data.message || '등록되었습니다.', 'success');
+        toast(data.message || (editingRiskId ? '수정되었습니다.' : '등록되었습니다.'), 'success');
         closeModal('modal-add-risk');
         loadRiskAssessments();
       } catch (e) { console.error(e); alert('업로드 실패: ' + e.message); toast(e.message, 'error'); }
@@ -2544,11 +2682,12 @@
       <td class="td-muted">${fmtAuthor(w.manager_name)}</td>
       <td>${statusLabel[w.status] || w.status}</td>
       <td>
-        ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
+        ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">` + imgs.map(img => `
           <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
-            <img src="/uploads/${encodeURIComponent(img.trim())}" alt="작업 사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
-            <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
-          </div>`).join('') + `</div>` : ''}
+            ${renderFileBadge(img.trim(), img.trim(), true)}
+          </div>`).join('') + `</div>` : '-'}
+      </td>
+      <td>
         <div class="td-actions" style="display:inline-flex;"><button class="btn btn-secondary btn-sm" onclick="openWpModal('${w.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="delWp('${w.id}')">🗑️</button></div>
       </td>
     </tr>`;
@@ -2562,12 +2701,15 @@
       ['wp-date', 'wp-content', 'wp-manager'].forEach(i => document.getElementById(i).value = '');
       document.getElementById('wp-date').value = new Date().toISOString().slice(0, 10);
 
+      wpDeletedFiles = [];
+      document.getElementById('wp-photo-preview').innerHTML = '';
       if (id) {
         api(`/api/workplans/${id}?userId=${currentUser?.id}`).then(data => {
           const w = data.work_plan;
           document.getElementById('wp-date').value = w.work_date || '';
           document.getElementById('wp-content').value = w.work_content || '';
           document.getElementById('wp-manager').value = w.manager_name || '';
+          if(w.image_path) renderFilePreview('wp-photo-preview', w.image_path, '', 'wpDeletedFiles', false);
         }).catch(e => toast(e.message, 'error'));
       }
       openModal('modal-wp');
@@ -2586,7 +2728,7 @@
         fd.append('work_date', date);
         fd.append('work_content', content);
         fd.append('manager_name', manager);
-        
+        fd.append('deleted_files', wpDeletedFiles.join(','));
 
         const photoInput = document.getElementById('wp-photo');
         if (photoInput && photoInput.files) {
@@ -2765,7 +2907,7 @@
       }
       tbody.innerHTML = list.map(d => `<tr>
     <td style="text-align:center;"><input type="checkbox" class="doc-checkbox" value="${d.id}"></td>
-    <td><a href="/uploads/${esc(d.file_path)}" target="_blank" style="color:var(--accent);text-decoration:none;">📄 ${esc(d.title)}</a></td>
+    <td>${renderFileBadge(d.file_path, d.title, true, `/uploads/${esc(d.file_path)}`)}</td>
     <td><span class="badge badge-blue">${esc(d.category) || '-'}</span></td>
     <td class="td-muted">${fmtAuthor(d.uploader_name)}</td>
     <td class="td-muted" style="white-space:nowrap;">${fmtDate(d.created_at)}</td>
