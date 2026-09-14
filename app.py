@@ -216,23 +216,38 @@ _run_migrations()
 
 
 # ── 업로드 파일 서빙 ─────────────────────────────────────────
+def _get_original_filename(filename):
+    db = get_db()
+    try:
+        # 1. documents
+        row = db.execute("SELECT original_file_name FROM documents WHERE file_path=?", (filename,)).fetchone()
+        if row and row['original_file_name']: 
+            return row['original_file_name']
+        
+        # 2. risk_assessments
+        row = db.execute("SELECT file_name FROM risk_assessments WHERE file_path=?", (filename,)).fetchone()
+        if row and row['file_name']: 
+            return row['file_name']
+    except Exception:
+        pass
+        
+    # 3. 그 외 (작업계획서 등) 확장자 복구 로직 (기존 정규식 개선)
+    import re
+    m = re.search(r'_(png|jpg|jpeg|gif|webp|pdf|xlsx|xls|doc|docx|ppt|pptx|csv|txt|zip|hwp)$', filename, re.I)
+    if m:
+        ext = m.group(1)
+        return filename[:m.start()] + '.' + ext
+    return filename
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
+    download_name = _get_original_filename(filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, download_name=download_name)
 
 @app.route('/uploads/<path:filename>/download')
 def download_uploaded_file(filename):
     """파일을 브라우저에서 직접 다운로드 - 확장자 없는 기존 파일도 정상 다운로드"""
-    import re, mimetypes as mt
-    # 확장자가 없는 기존 파일 (wp_img_xxx_png 형태) 처리
-    download_name = filename
-    if '.' not in os.path.basename(filename):
-        # 마지막 _ext 패턴을 .ext로 변환
-        m = re.search(r'_(png|jpg|jpeg|gif|webp|pdf|xlsx|xls|doc|docx|ppt|pptx|csv|txt)$', filename, re.I)
-        if m:
-            ext = m.group(1)
-            download_name = filename[:m.start()] + '.' + ext
+    download_name = _get_original_filename(filename)
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True, download_name=download_name)
 
 
