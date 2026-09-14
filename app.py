@@ -28,7 +28,7 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 ALLOWED_EXTENSIONS = {
-    'xlsx', 'xls', 'csv', 'pdf', 'doc', 'docx',
+    'xlsx', 'xls', 'csv', 'pdf', 'doc', 'docx', 'hwp', 'zip',
     'png', 'jpg', 'jpeg', 'webp', 'gif', 'txt'
 }
 
@@ -753,10 +753,13 @@ def get_project_info():
         user = get_user(view_as)
     db = get_db()
     try:
-        active_id = get_active_project_id()
+        active_id = request.form.get('projectId') or get_active_project_id() or ''
         projects = rows_to_list(db.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall())
         if user and user.get('role') != 'admin':
-            projects = [p for p in projects if p.get('updated_by') == user.get('name')]
+            # [권한 격리] 직원은 본인에게 배정되었거나 직접 생성한(배정된) 공사만 조회 가능
+            assigned = get_user_assigned_project_ids(user['id'])
+            if assigned is not None:
+                projects = [p for p in projects if p['id'] in assigned and p.get('status', 'active') != 'completed']
         
         proj_info = next((p for p in projects if p['id'] == active_id), None)
         if not proj_info and projects:
@@ -788,8 +791,19 @@ def create_project():
              data.get('location', ''), data.get('description', ''),
              n, user['name'] if user else '')
         )
+
         db.commit()
         set_active_project_id(pid)
+        
+        # [자동 권한 배정] 직원이 공사를 생성한 경우, 해당 직원에게 생성된 공사 권한을 즉시 부여
+        if user and user.get('role') != 'admin':
+            usa_id = new_id('usa')
+            db.execute(
+                "INSERT INTO user_site_assignments (id, user_id, project_id, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?)",
+                (usa_id, user['id'], pid, user['name'], n)
+            )
+            db.commit()
+
         projects = rows_to_list(db.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall())
         proj_info = next((p for p in projects if p['id'] == pid), None)
         add_audit_log(user['id'] if user else '', user['name'] if user else '',
@@ -872,7 +886,7 @@ def delete_project(pid):
             return jsonify({'error': '해당 공사를 찾을 수 없습니다.'}), 404
         db.execute("DELETE FROM projects WHERE id=?", (pid,))
         db.commit()
-        active_id = get_active_project_id()
+        active_id = request.form.get('projectId') or get_active_project_id() or ''
         if active_id == pid:
             first = row_to_dict(db.execute("SELECT id FROM projects ORDER BY updated_at DESC LIMIT 1").fetchone())
             if first:
@@ -904,7 +918,7 @@ def batch_delete_projects():
         for pid in ids:
             db.execute("DELETE FROM projects WHERE id=?", (pid,))
         db.commit()
-        active_id = get_active_project_id()
+        active_id = request.form.get('projectId') or get_active_project_id() or ''
         if active_id in ids:
             set_active_project_id(remaining[0]['id'])
         projects = rows_to_list(db.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall())
@@ -932,26 +946,28 @@ def get_workers():
     project_id = request.args.get('projectId', 'all')  # 관리자 필터
     db = get_db()
     try:
-        sql = "SELECT * FROM workers WHERE 1=1"
+        sql = "SELECT * FROM workers WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
         params = []
         # 권한 기반 현장 필터
-        assigned = get_user_assigned_project_ids(user_id) if user_id else []
-        if assigned is None:  # 관리자: 선택 필터 적용 가능
+        assigned = get_user_assigned_project_ids(user_id) if user_id else None
+        if assigned is not None:
+            if project_id and project_id != 'all':
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
+            else:
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
+        else:
             if project_id and project_id != 'all':
                 sql += " AND project_id=?"
                 params.append(project_id)
-        elif len(assigned) == 0:  # 미배정 직원
-            sql += " AND creator_id = ?"
-            params.append(user_id)
-        else:  # 직원: 배정 현장만
-            if project_id and project_id != 'all' and project_id in assigned:
-                sql += " AND (project_id=? OR creator_id=?)"
-                params.extend([project_id, user_id])
-            else:
-                placeholders = ','.join('?' * len(assigned))
-                sql += f" AND (project_id IN ({placeholders}) OR creator_id=?)"
-                params.extend(assigned)
-                params.append(user_id)
         if keyword:
             sql += " AND (name LIKE ? OR nationality LIKE ?)"
             params += [f'%{keyword}%'] * 2
@@ -998,10 +1014,11 @@ def create_worker():
             ext = os.path.splitext(f.filename)[1] or '.jpg'
             unique_name = f"wrk_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
             image_path = unique_name
 
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     db = get_db()
     try:
         active_proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (active_id,)).fetchone()) if active_id else None
@@ -1079,6 +1096,7 @@ def update_worker(wid):
                 ext = os.path.splitext(f.filename)[1] or '.jpg'
                 unique_name = f"wrk_{new_id('img')}{ext}"
                 save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
                 f.save(save_path)
                 image_path = unique_name
 
@@ -1132,20 +1150,27 @@ def get_work_plans():
     project_id = request.args.get('projectId', 'all')
     db = get_db()
     try:
-        sql = "SELECT * FROM work_plans WHERE 1=1"
+        sql = "SELECT * FROM work_plans WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
         params = []
-        assigned = get_user_assigned_project_ids(user_id) if user_id else []
-        if assigned is None:
+        assigned = get_user_assigned_project_ids(user_id) if user_id else None
+        if assigned is not None:
             if project_id and project_id != 'all':
-                sql += " AND project_id=?"; params.append(project_id)
-        elif len(assigned) == 0:
-            sql += " AND 1=0"
-        else:
-            if project_id and project_id != 'all' and project_id in assigned:
-                sql += " AND project_id=?"; params.append(project_id)
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
             else:
-                sql += f" AND project_id IN ({','.join('?'*len(assigned))})"
-                params.extend(assigned)
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
+        else:
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
         if keyword:
             sql += """ AND (site_name LIKE ? OR company_name LIKE ? OR
                        machinery_name LIKE ? OR vehicle_number LIKE ? OR usage_location LIKE ?)"""
@@ -1167,15 +1192,20 @@ def get_work_plans():
 def create_work_plan():
     data = request.get_json()
     user = get_user(data.get('userId'))
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     db = get_db()
     try:
         active_proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (active_id,)).fetchone()) if active_id else None
         wid = new_id('wp')
         n = now_iso()
         db.execute(
-            """INSERT INTO work_plans VALUES
-               (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO work_plans (
+                id, project_id, site_name, company_name, created_date, plan_category, 
+                heavy_handling, machinery_name, equipment_plan_type, specification, 
+                vehicle_number, equipment_year, registered_vendor, insurance_expiry_date, 
+                inspection_validity_date, ndt_testing_date, training_date, usage_start_date, 
+                usage_end_date, usage_location, creator_id, creator_name, created_at, updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (wid, data.get('projectId') or active_id,
              data.get('siteName') or (active_proj['project_name'] if active_proj else ''),
              data.get('companyName') or (active_proj['contractor_name'] if active_proj else ''),
@@ -1276,20 +1306,27 @@ def get_tbm_logs():
     project_id = request.args.get('projectId', 'all')
     db = get_db()
     try:
-        sql = "SELECT * FROM tbm_logs WHERE 1=1"
+        sql = "SELECT * FROM tbm_logs WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
         params = []
-        assigned = get_user_assigned_project_ids(user_id) if user_id else []
-        if assigned is None:
+        assigned = get_user_assigned_project_ids(user_id) if user_id else None
+        if assigned is not None:
             if project_id and project_id != 'all':
-                sql += " AND project_id=?"; params.append(project_id)
-        elif len(assigned) == 0:
-            sql += " AND 1=0"
-        else:
-            if project_id and project_id != 'all' and project_id in assigned:
-                sql += " AND project_id=?"; params.append(project_id)
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
             else:
-                sql += f" AND project_id IN ({','.join('?'*len(assigned))})"
-                params.extend(assigned)
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
+        else:
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
         if keyword:
             sql += """ AND (project_name LIKE ? OR instructor LIKE ? OR
                        work_details_hazards LIKE ? OR safety_measures LIKE ?)"""
@@ -1311,7 +1348,7 @@ def create_tbm_log():
     measures = (data.get('safetyMeasures') or '').strip()
     if not proj_name or not instructor or not hazards or not measures:
         return jsonify({'error': '필수 항목(공사명, 교육자, 작업사항/위험요인, 안전대책)을 입력해주세요.'}), 400
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     db = get_db()
     try:
         active_proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (active_id,)).fetchone()) if active_id else None
@@ -1319,13 +1356,17 @@ def create_tbm_log():
         n = now_iso()
         period = data.get('projectPeriod') or (active_proj['period_text'] if active_proj else '')
         db.execute(
-            "INSERT INTO tbm_logs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            """INSERT INTO tbm_logs (
+                id, project_id, project_name, project_period, instructor, 
+                work_details_hazards, safety_measures, special_notes, created_date, 
+                creator_id, creator_name, created_at, updated_at, image_path
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (tid, data.get('projectId') or active_id,
              proj_name, period, instructor, hazards, measures,
              (data.get('specialNotes') or '').strip(),
              data.get('createdDate') or n[:10],
              user['id'] if user else '', user['name'] if user else '',
-             n, n)
+             n, n, '')
         )
         db.commit()
         log = row_to_dict(db.execute("SELECT * FROM tbm_logs WHERE id=?", (tid,)).fetchone())
@@ -1407,8 +1448,10 @@ def get_documents():
     user = get_user(user_id)
     db = get_db()
     try:
-        sql = "SELECT * FROM documents WHERE 1=1"
-        params = []
+        deleted = request.args.get('deleted', 'false')
+        is_del = 1 if deleted.lower() == 'true' else 0
+        sql = "SELECT * FROM documents WHERE is_deleted=?"
+        params = [is_del]
         if project_id and project_id != 'all':
             sql += " AND (project_id=? OR project_id IS NULL OR project_id='')"
             params.append(project_id)
@@ -1464,9 +1507,9 @@ def upload_document():
     tags_raw = request.form.get('tags', '[]')
     visibility = request.form.get('visibility', 'all')
     target_dept = request.form.get('targetDepartment', '')
-    project_id = request.form.get('projectId') or get_active_project_id()
+    project_id = request.form.get('projectId') or get_active_project_id() or ''
 
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     db = get_db()
     try:
         active_proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (project_id or active_id,)).fetchone()) if (project_id or active_id) else None
@@ -1487,6 +1530,7 @@ def upload_document():
                 safe_name = secure_filename(f.filename)
                 unique_name = f"{new_id('file')}_{safe_name}"
                 save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
                 f.save(save_path)
                 file_size = os.path.getsize(save_path)
                 file_path = unique_name
@@ -1508,8 +1552,14 @@ def upload_document():
         tags_str = json.dumps(tags, ensure_ascii=False)
 
         db.execute(
-            """INSERT INTO documents VALUES
-               (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO documents (
+                id, project_id, project_name, title, original_file_name, file_type, 
+                mime_type, file_size, main_category, sub_category, category, tags, 
+                uploader_id, uploader_name, uploader_role, uploader_department, 
+                visibility, target_department, created_at, updated_at, file_path, 
+                download_count, view_count, ai_summary, ai_key_insights, 
+                ai_extracted_text, ai_detected_columns, ai_auto_tags, is_deleted
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (doc_id, project_id, proj_name,
              title, original_file_name, file_type_str, mime_type, file_size,
              main_category, sub_category or category, category,
@@ -1517,7 +1567,7 @@ def upload_document():
              user['id'], user['name'], user['role'], user['department'],
              visibility, target_dept,
              n, n, file_path, 0, 1,
-             f"{title} 파일이 서버에 저장되었습니다.", '[]', '', '[]')
+             f"{title} 파일이 서버에 저장되었습니다.", '[]', '', '[]', '[]', 0)
         )
         db.commit()
         doc = doc_row_to_dict(db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone())
@@ -1525,6 +1575,9 @@ def upload_document():
                       f"신규 문서 업로드 완료 [{title}] (타입: {file_type_str})",
                       doc_id, title)
         return jsonify({'success': True, 'document': doc})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -1548,6 +1601,9 @@ def get_document(doc_id):
             add_audit_log(user['id'], user['name'], user['role'], 'VIEW',
                           f"문서 상세 조회: [{doc['title']}]", doc_id, doc['title'])
         return jsonify({'success': True, 'document': doc})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -1585,6 +1641,38 @@ def update_document(doc_id):
         db.close()
 
 
+@app.route('/api/documents/bulk-restore', methods=['POST'])
+def bulk_restore_documents():
+    data = request.get_json() or {}
+    user_id = data.get('userId')
+    doc_ids = data.get('docIds', [])
+    user = get_user(user_id)
+    
+    if not doc_ids:
+        return jsonify({'error': '선택된 문서가 없습니다.'}), 400
+        
+    db = get_db()
+    try:
+        placeholders = ','.join('?' * len(doc_ids))
+        
+        # 권한 확인
+        if user and user['role'] != 'admin':
+            rows = db.execute(f"SELECT uploader_id FROM documents WHERE id IN ({placeholders})", doc_ids).fetchall()
+            for row in rows:
+                if row['uploader_id'] != user['id']:
+                    return jsonify({'error': '복원 권한이 없는 문서가 포함되어 있습니다.'}), 403
+                    
+        db.execute(f"UPDATE documents SET is_deleted=0 WHERE id IN ({placeholders})", doc_ids)
+        db.commit()
+        
+        if user:
+            add_audit_log(user['id'], user['name'], user['role'], 'RESTORE',
+                          f"문서 {len(doc_ids)}건 일괄 복원", 'bulk', '')
+                          
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
 @app.route('/api/documents/delete-multiple', methods=['DELETE'])
 def delete_multiple_documents():
     data = request.get_json() or {}
@@ -1606,24 +1694,52 @@ def delete_multiple_documents():
                 if row['uploader_id'] != user['id']:
                     return jsonify({'error': '삭제 권한이 없는 문서가 포함되어 있습니다.'}), 403
                     
-        # 파일 삭제 처리 로직 (로컬 파일 시스템에서도 삭제하려면 구현)
-        rows = db.execute(f"SELECT file_path FROM documents WHERE id IN ({placeholders})", doc_ids).fetchall()
-        for row in rows:
-            if row['file_path']:
-                full_path = os.path.join(app.config['UPLOAD_FOLDER'], row['file_path'])
-                if os.path.exists(full_path):
-                    try:
-                        os.remove(full_path)
-                    except:
-                        pass
-        
-        db.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        hard_delete = data.get('hard', False)
+        if hard_delete:
+            # 완전 삭제 모드 (파일 포함)
+            rows = db.execute(f"SELECT file_path FROM documents WHERE id IN ({placeholders})", doc_ids).fetchall()
+            for row in rows:
+                if row['file_path']:
+                    full_path = os.path.join(app.config['UPLOAD_FOLDER'], row['file_path'])
+                    if os.path.exists(full_path):
+                        try:
+                            os.remove(full_path)
+                        except:
+                            pass
+            db.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        else:
+            # 휴지통 이동 모드 (Soft Delete)
+            db.execute(f"UPDATE documents SET is_deleted=1 WHERE id IN ({placeholders})", doc_ids)
+            
         db.commit()
         
         if user:
             add_audit_log(user['id'], user['name'], user['role'], 'DELETE',
                           f"문서 {len(doc_ids)}건 일괄 삭제", 'bulk', '')
                           
+        return jsonify({'success': True})
+    finally:
+        db.close()
+
+@app.route('/api/documents/<doc_id>/restore', methods=['POST'])
+def restore_document(doc_id):
+    data = request.get_json() or {}
+    user_id = data.get('userId') or request.args.get('userId')
+    user = get_user(user_id)
+    db = get_db()
+    try:
+        row = db.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+        if not row:
+            return jsonify({'error': '문서를 찾을 수 없습니다.'}), 404
+        doc = row_to_dict(row)
+        if user and user['role'] != 'admin' and doc.get('uploader_id') != user['id']:
+            return jsonify({'error': '문서 복원 권한이 없습니다.'}), 403
+            
+        db.execute("UPDATE documents SET is_deleted=0 WHERE id=?", (doc_id,))
+        db.commit()
+        if user:
+            add_audit_log(user['id'], user['name'], user['role'], 'RESTORE',
+                          f"문서 복원 [{doc['title']}]", doc_id, doc['title'])
         return jsonify({'success': True})
     finally:
         db.close()
@@ -1640,12 +1756,18 @@ def delete_document(doc_id):
         doc = row_to_dict(row)
         if user and user['role'] != 'admin' and doc.get('uploader_id') != user['id']:
             return jsonify({'error': '문서 삭제 권한이 없습니다.'}), 403
-        # 실제 파일 삭제
-        if doc.get('file_path'):
-            fp = os.path.join(app.config['UPLOAD_FOLDER'], doc['file_path'])
-            if os.path.exists(fp):
-                os.remove(fp)
-        db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+        hard_delete = request.args.get('hard', 'false').lower() == 'true'
+        if hard_delete:
+            if doc.get('file_path'):
+                fp = os.path.join(app.config['UPLOAD_FOLDER'], doc['file_path'])
+                if os.path.exists(fp):
+                    try:
+                        os.remove(fp)
+                    except:
+                        pass
+            db.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+        else:
+            db.execute("UPDATE documents SET is_deleted=1 WHERE id=?", (doc_id,))
         db.commit()
         if user:
             add_audit_log(user['id'], user['name'], user['role'], 'DELETE',
@@ -1746,7 +1868,7 @@ def get_stats():
 # ════════════════════════════════════════════════════════════
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
-    return jsonify({'success': True, 'categories': CATEGORY_MAP})
+        return jsonify({'success': True, 'categories': CATEGORY_MAP})
 
 
 # ════════════════════════════════════════════════════════════
@@ -1762,27 +1884,27 @@ def simple_get_tbm():
     project_id = request.args.get('projectId', 'all')
     db = get_db()
     try:
-        assigned = get_user_assigned_project_ids(user_id) if user_id else None
-        sql = "SELECT * FROM tbm_logs WHERE 1=1"
+        assigned = get_user_assigned_project_ids(user_id) if user_id else []
+        sql = "SELECT * FROM tbm_logs WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
         params = []
-        if assigned is None:  # 관리자
+        if assigned is not None:
             if project_id and project_id != 'all':
-                sql += " AND project_id=?"
-                params.append(project_id)
-        elif len(assigned) == 0:  # 미배정 직원
-            sql += " AND creator_id = ?"
-            params.append(user_id)
-            if project_id and project_id != 'all':
-                sql += " AND project_id=?"
-                params.append(project_id)
-        else:
-            if project_id and project_id != 'all' and project_id in assigned:
-                sql += " AND (project_id=? OR creator_id=?)"
-                params.extend([project_id, user_id])
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
             else:
-                sql += f" AND (project_id IN ({','.join('?'*len(assigned))}) OR creator_id = ?)"
-                params.extend(assigned)
-                params.append(user_id)
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
+        else:
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
         sql += " ORDER BY created_at DESC"
         logs = rows_to_list(db.execute(sql, params).fetchall())
         return jsonify({'success': True, 'tbm_logs': logs})
@@ -1792,7 +1914,7 @@ def simple_get_tbm():
 @app.route('/api/tbm', methods=['POST'])
 def simple_create_tbm():
     user = get_user(request.form.get('userId'))
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     
     image_path = ''
     files = request.files.getlist('files')
@@ -1801,16 +1923,20 @@ def simple_create_tbm():
         if f and f.filename: files = [f]
     saved = []
     for f in files:
-        if f and f.filename:
-            ext = os.path.splitext(f.filename)[1] or '.jpg'
+        if f and f.filename and allowed_file(f.filename):
+            ext = (os.path.splitext(f.filename)[1] or '').lower()
             unique_name = f"tbm_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
-            try:
-                img = Image.open(save_path)
-                img.thumbnail((1200, 1200))
-                img.save(save_path, optimize=True, quality=85)
-            except Exception: pass
+            
+            if ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                try:
+                    img = Image.open(save_path)
+                    img.thumbnail((1200, 1200))
+                    img.save(save_path, optimize=True, quality=85)
+                except Exception:
+                    pass
             saved.append(unique_name)
     if saved:
         image_path = ','.join(saved)
@@ -1845,6 +1971,9 @@ def simple_create_tbm():
         if user:
             add_audit_log(user['id'], user['name'], user['role'], 'EDIT', f"TBM 작성: {request.form.get('created_date','')}")
         return jsonify({'success': True, 'tbm_log': log})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -1854,6 +1983,9 @@ def simple_get_tbm_one(tid):
     try:
         log = row_to_dict(db.execute("SELECT * FROM tbm_logs WHERE id=?", (tid,)).fetchone())
         return jsonify({'success': True, 'tbm_log': log})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -1868,16 +2000,20 @@ def simple_update_tbm(tid):
         if f and f.filename: files = [f]
     saved = []
     for f in files:
-        if f and f.filename:
-            ext = os.path.splitext(f.filename)[1] or '.jpg'
+        if f and f.filename and allowed_file(f.filename):
+            ext = (os.path.splitext(f.filename)[1] or '').lower()
             unique_name = f"tbm_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
-            try:
-                img = Image.open(save_path)
-                img.thumbnail((1200, 1200))
-                img.save(save_path, optimize=True, quality=85)
-            except Exception: pass
+            
+            if ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                try:
+                    img = Image.open(save_path)
+                    img.thumbnail((1200, 1200))
+                    img.save(save_path, optimize=True, quality=85)
+                except Exception:
+                    pass
             saved.append(unique_name)
     if saved:
         # 기존 이미지에 추가
@@ -1907,6 +2043,9 @@ def simple_update_tbm(tid):
         db.commit()
         log = row_to_dict(db.execute("SELECT * FROM tbm_logs WHERE id=?", (tid,)).fetchone())
         return jsonify({'success': True, 'tbm_log': log})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -1937,26 +2076,26 @@ def simple_get_workplans():
     db = get_db()
     try:
         assigned = get_user_assigned_project_ids(user_id) if user_id else None
-        sql = "SELECT * FROM workplans WHERE 1=1"
+        sql = "SELECT * FROM workplans WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
         params = []
-        if assigned is None:
+        if assigned is not None:
             if project_id and project_id != 'all':
-                sql += " AND project_id=?"
-                params.append(project_id)
-        elif len(assigned) == 0:
-            sql += " AND creator_id = ?"
-            params.append(user_id)
-            if project_id and project_id != 'all':
-                sql += " AND project_id=?"
-                params.append(project_id)
-        else:
-            if project_id and project_id != 'all' and project_id in assigned:
-                sql += " AND (project_id=? OR creator_id=?)"
-                params.extend([project_id, user_id])
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
             else:
-                sql += f" AND (project_id IN ({','.join('?'*len(assigned))}) OR creator_id = ?)"
-                params.extend(assigned)
-                params.append(user_id)
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
+        else:
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
         sql += " ORDER BY created_at DESC"
         plans = rows_to_list(db.execute(sql, params).fetchall())
         return jsonify({'success': True, 'work_plans': plans})
@@ -1966,7 +2105,7 @@ def simple_get_workplans():
 @app.route('/api/workplans', methods=['POST'])
 def simple_create_workplan():
     user = get_user(request.form.get('userId'))
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     
     image_path = ''
     files = request.files.getlist('files')
@@ -1975,16 +2114,20 @@ def simple_create_workplan():
         if f and f.filename: files = [f]
     saved = []
     for f in files:
-        if f and f.filename:
-            ext = os.path.splitext(f.filename)[1] or '.jpg'
+        if f and f.filename and allowed_file(f.filename):
+            ext = (os.path.splitext(f.filename)[1] or '').lower()
             unique_name = f"wp_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
-            try:
-                img = Image.open(save_path)
-                img.thumbnail((1200, 1200))
-                img.save(save_path, optimize=True, quality=85)
-            except Exception: pass
+            
+            if ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                try:
+                    img = Image.open(save_path)
+                    img.thumbnail((1200, 1200))
+                    img.save(save_path, optimize=True, quality=85)
+                except Exception:
+                    pass
             saved.append(unique_name)
     if saved:
         image_path = ','.join(saved)
@@ -2001,12 +2144,11 @@ def simple_create_workplan():
             db.commit()
 
         db.execute(
-            "INSERT INTO workplans (id, project_id, work_date, work_content, manager_name, status, creator_id, created_at, image_path) VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO workplans (id, project_id, work_date, work_content, manager_name, creator_id, created_at, image_path) VALUES (?,?,?,?,?,?,?,?)",
             (wid, active_id,
              request.form.get('work_date', n[:10]),
              request.form.get('work_content',''),
              request.form.get('manager_name',''),
-             request.form.get('status','planned'),
              user['id'] if user else '', n, image_path)
         )
         db.commit()
@@ -2035,16 +2177,20 @@ def simple_update_workplan(wid):
         if f and f.filename: files = [f]
     saved = []
     for f in files:
-        if f and f.filename:
-            ext = os.path.splitext(f.filename)[1] or '.jpg'
+        if f and f.filename and allowed_file(f.filename):
+            ext = (os.path.splitext(f.filename)[1] or '').lower()
             unique_name = f"wp_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
-            try:
-                img = Image.open(save_path)
-                img.thumbnail((1200, 1200))
-                img.save(save_path, optimize=True, quality=85)
-            except Exception: pass
+            
+            if ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                try:
+                    img = Image.open(save_path)
+                    img.thumbnail((1200, 1200))
+                    img.save(save_path, optimize=True, quality=85)
+                except Exception:
+                    pass
             saved.append(unique_name)
     if saved:
         db_tmp = get_db()
@@ -2061,13 +2207,13 @@ def simple_update_workplan(wid):
     db = get_db()
     try:
         if image_path:
-            db.execute("UPDATE workplans SET work_date=?, work_content=?, manager_name=?, status=?, image_path=? WHERE id=?",
+            db.execute("UPDATE workplans SET work_date=?, work_content=?, manager_name=?, image_path=? WHERE id=?",
                        (request.form.get('work_date',''), request.form.get('work_content',''),
-                        request.form.get('manager_name',''), request.form.get('status','planned'), image_path, wid))
+                        request.form.get('manager_name',''), image_path, wid))
         else:
-            db.execute("UPDATE workplans SET work_date=?, work_content=?, manager_name=?, status=? WHERE id=?",
+            db.execute("UPDATE workplans SET work_date=?, work_content=?, manager_name=? WHERE id=?",
                        (request.form.get('work_date',''), request.form.get('work_content',''),
-                        request.form.get('manager_name',''), request.form.get('status','planned'), wid))
+                        request.form.get('manager_name',''), wid))
         db.commit()
         plan = row_to_dict(db.execute("SELECT * FROM workplans WHERE id=?", (wid,)).fetchone())
         return jsonify({'success': True, 'work_plan': plan})
@@ -2093,6 +2239,12 @@ def get_projects_simple():
     db = get_db()
     try:
         projects = rows_to_list(db.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall())
+        user_id = request.args.get('userId', '').strip()
+        user = get_user(user_id) if user_id else None
+        if user and user.get('role') != 'admin':
+            assigned = get_user_assigned_project_ids(user['id'])
+            if assigned is not None:
+                projects = [p for p in projects if p['id'] in assigned and p.get('status', 'active') != 'completed']
         return jsonify({'success': True, 'projects': projects})
     finally:
         db.close()
@@ -2110,11 +2262,16 @@ def create_project_simple():
         n = now_iso()
         start = data.get('start_date','')
         end = data.get('end_date','')
+        
+        # [영구 고정] 공사금액 필수 해제: 비어있거나 null이면 '0'으로 안전하게 DB 저장되도록 예외 처리
+        contract_amt = data.get('contract_amount', '')
+        if not contract_amt:
+            contract_amt = '0'
         db.execute(
             """INSERT INTO projects (id,project_name,contract_amount,start_date,end_date,
                period_text,client_name,contractor_name,location,description,extra_notes,
                site_manager,safety_manager,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (pid, name, data.get('contract_amount',''), start, end,
+            (pid, name, contract_amt, start, end,
              f"{start} ~ {end}",
              '', data.get('contractor_name',''),
              data.get('location',''), data.get('description',''),
@@ -2122,8 +2279,19 @@ def create_project_simple():
              data.get('site_manager',''), '',
              n, user['name'] if user else '')
         )
+
         db.commit()
         set_active_project_id(pid)
+        
+        # [자동 권한 배정] 직원이 공사를 생성한 경우, 해당 직원에게 생성된 공사 권한을 즉시 부여
+        if user and user.get('role') != 'admin':
+            usa_id = new_id('usa')
+            db.execute(
+                "INSERT INTO user_site_assignments (id, user_id, project_id, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?)",
+                (usa_id, user['id'], pid, user['name'], n)
+            )
+            db.commit()
+
         proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone())
         if user:
             add_audit_log(user['id'], user['name'], user['role'], 'UPLOAD', f"공사 등록: {name}")
@@ -2142,10 +2310,15 @@ def update_project_simple(pid):
             return jsonify({'error': '공사를 찾을 수 없습니다.'}), 404
         def v(k): return data.get(k) if data.get(k) is not None else existing.get(k,'')
         start = v('start_date'); end = v('end_date')
+        
+        # [영구 고정] 공사금액 필수 해제: 비어있거나 null이면 '0'으로 안전하게 DB 저장되도록 예외 처리
+        contract_amt = v('contract_amount')
+        if not contract_amt:
+            contract_amt = '0'
         db.execute("""UPDATE projects SET project_name=?,contract_amount=?,start_date=?,end_date=?,
                       period_text=?,contractor_name=?,location=?,description=?,extra_notes=?,
                       site_manager=?,updated_at=?,updated_by=? WHERE id=?""",
-                   (v('project_name'), v('contract_amount'), start, end,
+                   (v('project_name'), contract_amt, start, end,
                     f"{start} ~ {end}",
                     v('contractor_name'), v('location'), v('description'), v('extra_notes'),
                     v('site_manager'), now_iso(),
@@ -2155,6 +2328,34 @@ def update_project_simple(pid):
         return jsonify({'success': True, 'project': proj})
     finally:
         db.close()
+
+@app.route('/api/projects/<pid>/status', methods=['PATCH'])
+def update_project_status(pid):
+    data = request.get_json() or {}
+    user = get_user(data.get('userId'))
+    new_status = data.get('status')
+    if not new_status in ['active', 'completed']:
+        return jsonify({'error': '유효하지 않은 상태입니다.'}), 400
+    
+    db = get_db()
+    try:
+        existing = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone())
+        if not existing:
+            return jsonify({'error': '공사를 찾을 수 없습니다.'}), 404
+            
+        # 권한 체크: 관리자이거나, 해당 현장 담당자인 경우
+        if not (user and (user.get('role') == 'admin' or existing.get('creator_id') == user.get('id') or existing.get('updated_by') == user.get('name'))):
+            return jsonify({'error': '상태 변경 권한이 없습니다.'}), 403
+            
+        db.execute("UPDATE projects SET status=?, updated_at=?, updated_by=? WHERE id=?",
+                   (new_status, now_iso(), user['name'] if user else '', pid))
+        db.commit()
+        
+        proj = row_to_dict(db.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone())
+        return jsonify({'success': True, 'project': proj})
+    finally:
+        db.close()
+
 
 @app.route('/api/projects/<pid>', methods=['DELETE'])
 def delete_project_simple(pid):
@@ -2244,9 +2445,9 @@ def get_risk_assessments():
     db = get_db()
     try:
         if project_id == 'all':
-            rows = db.execute("SELECT * FROM risk_assessments ORDER BY eval_date DESC").fetchall()
+            rows = db.execute("SELECT * FROM risk_assessments WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed') ORDER BY eval_date DESC").fetchall()
         else:
-            rows = db.execute("SELECT * FROM risk_assessments WHERE project_id=? ORDER BY eval_date DESC", (project_id,)).fetchall()
+            rows = db.execute("SELECT * FROM risk_assessments WHERE project_id=? AND project_id IN (SELECT id FROM projects WHERE status != 'completed') ORDER BY eval_date DESC", (project_id,)).fetchall()
         
         result = []
         for r in rows:
@@ -2284,6 +2485,7 @@ def create_risk_assessment():
             safe_name = secure_filename(f.filename)
             unique_name = f"{new_id('riskimg')}_{safe_name}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
             file_path = unique_name
 
@@ -2300,6 +2502,9 @@ def create_risk_assessment():
         )
         db.commit()
         return jsonify({'success': True, 'message': '위험성평가가 등록되었습니다.', 'id': rid})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -2328,27 +2533,27 @@ def get_daily_reports():
     project_id = request.args.get('projectId', 'all')
     db = get_db()
     try:
-        assigned = get_user_assigned_project_ids(user_id) if user_id else None
-        sql = "SELECT * FROM daily_reports WHERE 1=1"
+        assigned = get_user_assigned_project_ids(user_id) if user_id else []
+        sql = "SELECT * FROM daily_reports WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
         params = []
-        if assigned is None:
+        if assigned is not None:
             if project_id and project_id != 'all':
-                sql += " AND project_id=?"
-                params.append(project_id)
-        elif len(assigned) == 0:
-            sql += " AND creator_id = ?"
-            params.append(user_id)
-            if project_id and project_id != 'all':
-                sql += " AND project_id=?"
-                params.append(project_id)
-        else:
-            if project_id and project_id != 'all' and project_id in assigned:
-                sql += " AND (project_id=? OR creator_id=?)"
-                params.extend([project_id, user_id])
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
             else:
-                sql += f" AND (project_id IN ({','.join('?'*len(assigned))}) OR creator_id = ?)"
-                params.extend(assigned)
-                params.append(user_id)
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
+        else:
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
         sql += " ORDER BY created_at DESC"
         reports = rows_to_list(db.execute(sql, params).fetchall())
         return jsonify({'success': True, 'daily_reports': reports})
@@ -2358,7 +2563,7 @@ def get_daily_reports():
 @app.route('/api/daily-reports', methods=['POST'])
 def create_daily_report():
     user = get_user(request.form.get('userId'))
-    active_id = get_active_project_id()
+    active_id = request.form.get('projectId') or get_active_project_id() or ''
     
     image_path = ''
     files = request.files.getlist('files')
@@ -2367,16 +2572,20 @@ def create_daily_report():
         if f and f.filename: files = [f]
     saved = []
     for f in files:
-        if f and f.filename:
-            ext = os.path.splitext(f.filename)[1] or '.jpg'
+        if f and f.filename and allowed_file(f.filename):
+            ext = (os.path.splitext(f.filename)[1] or '').lower()
             unique_name = f"dr_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
-            try:
-                img = Image.open(save_path)
-                img.thumbnail((1200, 1200))
-                img.save(save_path, optimize=True, quality=85)
-            except Exception: pass
+            
+            if ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                try:
+                    img = Image.open(save_path)
+                    img.thumbnail((1200, 1200))
+                    img.save(save_path, optimize=True, quality=85)
+                except Exception:
+                    pass
             saved.append(unique_name)
     if saved: image_path = ','.join(saved)
     
@@ -2386,16 +2595,18 @@ def create_daily_report():
     try:
         db.execute(
             """INSERT INTO daily_reports 
-                 (id, project_id, work_date, work_content, manager_name, status, creator_id, created_at, image_path)
-                 VALUES (?,?,?,?,?,?,?,?,?)""",
+                 (id, project_id, work_date, work_content, manager_name, creator_id, created_at, image_path)
+                 VALUES (?,?,?,?,?,?,?,?)""",
             (did, request.form.get('projectId') or active_id,
              request.form.get('work_date',''), request.form.get('work_content',''),
-             request.form.get('manager_name',''), request.form.get('status','planned'),
-             user['id'] if user else '', n, image_path)
+             request.form.get('manager_name',''), user['id'] if user else '', n, image_path)
         )
         db.commit()
         report = row_to_dict(db.execute("SELECT * FROM daily_reports WHERE id=?", (did,)).fetchone())
         return jsonify({'success': True, 'daily_report': report})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 
@@ -2410,16 +2621,20 @@ def update_daily_report(did):
         if f and f.filename: files = [f]
     saved = []
     for f in files:
-        if f and f.filename:
-            ext = os.path.splitext(f.filename)[1] or '.jpg'
+        if f and f.filename and allowed_file(f.filename):
+            ext = (os.path.splitext(f.filename)[1] or '').lower()
             unique_name = f"dr_{new_id('img')}{ext}"
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             f.save(save_path)
-            try:
-                img = Image.open(save_path)
-                img.thumbnail((1200, 1200))
-                img.save(save_path, optimize=True, quality=85)
-            except Exception: pass
+            
+            if ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                try:
+                    img = Image.open(save_path)
+                    img.thumbnail((1200, 1200))
+                    img.save(save_path, optimize=True, quality=85)
+                except Exception:
+                    pass
             saved.append(unique_name)
     if saved:
         db_tmp = get_db()
@@ -2436,16 +2651,19 @@ def update_daily_report(did):
     db = get_db()
     try:
         if image_path:
-            db.execute("""UPDATE daily_reports SET work_date=?, work_content=?, manager_name=?, status=?, image_path=? WHERE id=?""",
+            db.execute("""UPDATE daily_reports SET work_date=?, work_content=?, manager_name=?, image_path=? WHERE id=?""",
                        (request.form.get('work_date',''), request.form.get('work_content',''),
-                        request.form.get('manager_name',''), request.form.get('status',''), image_path, did))
+                        request.form.get('manager_name',''), image_path, did))
         else:
-            db.execute("""UPDATE daily_reports SET work_date=?, work_content=?, manager_name=?, status=? WHERE id=?""",
+            db.execute("""UPDATE daily_reports SET work_date=?, work_content=?, manager_name=? WHERE id=?""",
                        (request.form.get('work_date',''), request.form.get('work_content',''),
-                        request.form.get('manager_name',''), request.form.get('status',''), did))
+                        request.form.get('manager_name',''), did))
         db.commit()
         report = row_to_dict(db.execute("SELECT * FROM daily_reports WHERE id=?", (did,)).fetchone())
         return jsonify({'success': True, 'daily_report': report})
+    except Exception as e:
+        print(f'[Error in upload]: {e}')
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 

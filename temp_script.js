@@ -92,7 +92,7 @@
       // 히스토리
       if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
       // 데이터 로드
-      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
       if (loaders[page]) loaders[page]();
       // 계정 관리는 관리자만
       if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
@@ -392,14 +392,14 @@
           api('/api/notices').catch(() => ({})),
           api('/api/project-info').catch(() => ({}))
         ]);
-        if (projData.project) {
-          document.getElementById('proj-name-label').textContent = projData.project.project_name || '공사명 미등록';
+        if (projData.projectInfo) {
+          document.getElementById('proj-name-label').textContent = projData.projectInfo.project_name || '공사명 미등록';
         }
         const s = statsData.stats || {};
-        document.getElementById('stat-docs').textContent = s.total_documents ?? '-';
-        document.getElementById('stat-workers').textContent = s.total_workers ?? '-';
-        document.getElementById('stat-tbm').textContent = s.total_tbm ?? '-';
-        document.getElementById('stat-workplans').textContent = s.total_workplans ?? '-';
+        document.getElementById('stat-docs').textContent = s.totalDocuments ?? '-';
+        document.getElementById('stat-workers').textContent = s.workerCount ?? '-';
+        document.getElementById('stat-tbm').textContent = s.tbmCount ?? '-';
+        document.getElementById('stat-workplans').textContent = s.workPlanCount ?? '-';
         
         const notices = (noticesData.notices || []).slice(0, 10);
         const tbody = document.getElementById('dash-notice-tbody');
@@ -422,11 +422,52 @@
         const viewAs = document.getElementById('view-as-employee')?.value || '';
         const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
         const projects = data.projects || [];
-        const options = '<option value="all">전체 현장</option>' + projects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
-        ['filter-workers-project', 'filter-workplan-project', 'filter-tbm-project'].forEach(id => {
+        
+        const activeProjects = projects.filter(p => p.status !== 'completed');
+        const completedProjects = projects.filter(p => p.status === 'completed');
+        
+        const activeOpts = activeProjects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+        const compOpts = completedProjects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+        
+        let options = '';
+        if (activeOpts) options += `<optgroup label="진행중 현장">${activeOpts}</optgroup>`;
+        if (compOpts) options += `<optgroup label="준공된 현장">${compOpts}</optgroup>`;
+        
+        let defaultId = '';
+        if (activeProjects.length > 0) defaultId = activeProjects[0].id;
+        else if (completedProjects.length > 0) defaultId = completedProjects[0].id;
+
+        ['filter-workers-project', 'filter-workplan-project', 'filter-daily-project', 'filter-tbm-project', 'filter-risk-project'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) el.innerHTML = options;
+          if (el) {
+            const oldVal = el.value;
+            el.innerHTML = options;
+            
+            const isValid = activeProjects.some(p => p.id === oldVal) || completedProjects.some(p => p.id === oldVal);
+            if (isValid) {
+                el.value = oldVal;
+            } else if (defaultId) {
+                el.value = defaultId;
+            }
+          }
         });
+        
+        const activeOnlyOpts = activeProjects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+        ['wp-project', 'daily-project', 'tbm-project', 'risk-project'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const oldVal = el.value;
+                el.innerHTML = activeOnlyOpts;
+                
+                const isValid = activeProjects.some(p => p.id === oldVal);
+                if (isValid) {
+                    el.value = oldVal;
+                } else if (activeProjects.length > 0) {
+                    el.value = activeProjects[0].id;
+                }
+            }
+        });
+        
       } catch (e) { console.error('Project dropdown load failed', e); }
     }
     
@@ -438,9 +479,16 @@
         const container = document.getElementById('proj-view');
         const isAdmin = currentUser?.role === 'admin';
 
-        if (!projectDataList.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 공사 정보가 없습니다.</p></div>'; return; }
+        const activeProjects = projectDataList.filter(p => p.status !== 'completed');
+        const completedProjects = projectDataList.filter(p => p.status === 'completed');
         
-        container.innerHTML = projectDataList.map(p => {
+        const compContainer = document.getElementById('completed-proj-view');
+        
+        // Render Active Projects
+        if (container) {
+          if (!activeProjects.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 진행중 현장이 없습니다.</p></div>'; }
+          else {
+            container.innerHTML = activeProjects.map(p => {
           const canEdit = isAdmin || p.updated_by === currentUser?.name;
           return `
           <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);">
@@ -459,18 +507,33 @@
               <div style="grid-column:1/-1;"><label style="color:var(--text-muted);font-size:12px;">현장 주소</label><p style="margin-top:4px;font-size:13px;">${esc(p.location || p.site_address)}</p></div>
             </div>
           </div>`;
-        }).join('');
-      
-        // Populate all project selectors
-        const filters = document.querySelectorAll('.project-selector-filter');
-        const inputs = document.querySelectorAll('.project-selector-input');
-        const opts = data.projects.map(p => `<option value="${p.id}">${p.project_name}</option>`).join('');
-        filters.forEach(f => {
-          const val = f.value;
-          f.innerHTML = `<option value="all">전체 현장</option>` + opts;
-          if (val) f.value = val;
-        });
-        inputs.forEach(i => i.innerHTML = opts);
+            }).join('');
+          }
+        }
+        
+        // Render Completed Projects
+        if (compContainer) {
+          if (!completedProjects.length) { compContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>준공된 현장이 없습니다.</p></div>'; }
+          else {
+            compContainer.innerHTML = completedProjects.map(p => {
+              const canEdit = isAdmin || p.updated_by === currentUser?.name;
+              return `
+              <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);opacity:0.8;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+                  <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
+                  ${canEdit ? `<div>
+                    <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;" onclick="restoreProject('${p.id}')">🔄 진행중 복구</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
+                  </div>` : ''}
+                </div>
+                <div class="grid-2" style="gap:16px;">
+                  <div><label style="color:var(--text-muted);font-size:12px;">업체명 / 발주처</label><p style="margin-top:4px;font-size:14px;font-weight:600;">${esc(p.contractor_name || p.client_name || '-')}</p></div>
+                  <div><label style="color:var(--text-muted);font-size:12px;">공사 기간</label><p style="margin-top:4px;font-size:13px;">${esc(p.start_date)} ~ ${esc(p.end_date)}</p></div>
+                </div>
+              </div>`;
+            }).join('');
+          }
+        }
       } catch (e) { toast('공사정보 로딩 실패: ' + e.message, 'error'); }
     }
 
@@ -615,7 +678,6 @@
         fd.append('manager_name', manager);
         fd.append('status', status);
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         
         const photoInput = document.getElementById('daily-photo');
         if (photoInput && photoInput.files) {
@@ -702,7 +764,6 @@
       try {
         const fd = new FormData();
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         fd.append('created_date', date);
         fd.append('work_details_hazards', hazards);
         fd.append('safety_measures', measures);
@@ -795,7 +856,6 @@
         fd.append('taskName', task);
         fd.append('content', content);
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         
         if (fileInput && fileInput.files && fileInput.files[0]) {
           fd.append('file', fileInput.files[0]);
@@ -876,8 +936,6 @@
       try {
         const fd = new FormData();
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
-      fd.append('projectId', document.getElementById('wp-project').value);
         fd.append('work_date', date);
         fd.append('work_content', content);
         fd.append('manager_name', manager);
@@ -939,7 +997,6 @@
       try {
         const fd = new FormData();
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         fd.append('title', title);
         fd.append('content', document.getElementById('notice-content').value.trim());
         const fileInput = document.getElementById('notice-file');
@@ -988,7 +1045,7 @@
       const amount = document.getElementById('np-amount').value.trim();
       const manager = document.getElementById('np-manager').value.trim();
       const location = document.getElementById('np-location').value.trim();
-      if (!name || !contractor || !start || !end || !manager || !location) {
+      if (!name || !contractor || !start || !end || !amount || !manager || !location) {
         toast('필수 항목을 모두 입력하세요.', 'error'); return;
       }
       try {
@@ -1048,7 +1105,6 @@
       fd.append('category', document.getElementById('up-cat').value);
       fd.append('description', document.getElementById('up-desc').value);
       fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
       try {
         const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
         const data = await res.json();
@@ -1127,7 +1183,7 @@
     function onViewAsChange() {
       const page = document.querySelector('.page.active')?.id?.replace('page-', '');
       if (page) {
-        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
         if (loaders[page]) loaders[page]();
       }
     }

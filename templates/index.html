@@ -845,6 +845,7 @@
           <div class="sidebar-item" onclick="navigateTo('daily')" id="nav-daily">📰 작업일보</div>
           <div class="sidebar-item" onclick="navigateTo('tbm')" id="nav-tbm">📢 TBM 일지</div>
           <div class="sidebar-item" onclick="navigateTo('risk')" id="nav-risk">⚠️ 위험성평가</div>
+          <div class="sidebar-item" onclick="navigateTo('completed-projects')" id="nav-completed-projects">✅ 준공현장</div>
           <div class="sidebar-section">자료</div>
           <div class="sidebar-item" onclick="navigateTo('docs')" id="nav-docs">📁 문서 관리</div>
           <div class="sidebar-item" onclick="navigateTo('notice')" id="nav-notice">📣 공지</div>
@@ -968,6 +969,22 @@
             </div>
           </div>
 
+          <!-- ── COMPLETED PROJECTS ── -->
+          <div class="page" id="page-completed-projects">
+            <div class="section-title">✅ 준공현장</div>
+            <div class="section-desc">준공 처리된 현장 목록입니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title">준공 현장 목록</div>
+              </div>
+              <div class="card-body">
+                <div id="completed-proj-view">
+                  <div class="loading"><div class="spinner"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- ── WORKERS ── -->
           <div class="page" id="page-workers">
             <div class="section-title">👷 근로자 이력정보</div>
@@ -977,7 +994,7 @@
                 <div class="card-title" style="display:flex;align-items:center;gap:12px;">
                   근로자 목록
                   <select id="filter-workers-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadWorkers()">
-                    <option value="all">전체 현장</option>
+                    
                   </select>
                 </div>
                 <button class="btn btn-primary btn-sm" id="add-worker-btn" onclick="openWorkerModal(null)">+ 근로자 추가</button>
@@ -1016,7 +1033,7 @@
                 <div class="card-title" style="display:flex;align-items:center;gap:12px;">
                   작업계획서 목록
                   <select id="filter-workplan-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadWorkplans()">
-                    <option value="all">전체 현장</option>
+                    
                   </select>
                 </div>
                 <button class="btn btn-primary btn-sm" id="add-wp-btn" onclick="openWpModal(null)">+ 작성</button>
@@ -1049,32 +1066,40 @@
           
           <!-- ── DAILY REPORTS (작업일보) ── -->
           <div class="page" id="page-daily">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-              <div>
-                <div class="section-title">📰 작업일보</div>
-                <div class="section-desc">매일 진행된 작업 내용을 기록하고 관리합니다.</div>
+            <div class="section-title">📰 작업일보</div>
+            <div class="section-desc">매일 진행된 작업 내용을 기록하고 관리합니다.</div>
+            <div class="card">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="card-title" style="display:flex;align-items:center;gap:12px;">
+                  작업일보 목록
+                  <select id="filter-daily-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadDailyReports()">
+                    
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openDailyModal()">+ 작성</button>
               </div>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <select class="form-control" id="filter-daily-project" onchange="loadDailyReports()" style="width:180px;">
-                  <option value="all">전체 공사</option>
-                </select>
-                <button class="btn btn-primary" onclick="openDailyModal()">+ 작업일보 등록</button>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>일자</th>
+                      <th>작업 내용</th>
+                      <th>담당자</th>
+                      <th>사진</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daily-tbody">
+                    <tr>
+                      <td colspan="5">
+                        <div class="loading">
+                          <div class="spinner"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <div class="table-container">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>일자</th>
-                    <th>작업내용</th>
-                    <th>담당자</th>
-                    <th>상태</th>
-                    <th>사진</th>
-                    <th style="width:100px;">관리</th>
-                  </tr>
-                </thead>
-                <tbody id="daily-tbody"></tbody>
-              </table>
             </div>
           </div>
 
@@ -1087,7 +1112,7 @@
                 <div class="card-title" style="display:flex;align-items:center;gap:12px;">
                   TBM 목록
                   <select id="filter-tbm-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadTbmList()">
-                    <option value="all">전체 현장</option>
+                    
                   </select>
                 </div>
                 <button class="btn btn-primary btn-sm" id="add-tbm-btn" onclick="openTbmModal(null)">+ 작성</button>
@@ -1126,7 +1151,7 @@
                 <div class="card-title" style="display:flex;align-items:center;gap:12px;">
                   위험성평가 목록
                   <select id="filter-risk-project" class="form-control" style="width:200px;display:inline-block;padding:4px 8px;font-size:13px;" onchange="loadRiskAssessments()">
-                    <option value="all">전체 현장</option>
+                    
                   </select>
                 </div>
                 <button class="btn btn-primary btn-sm" id="add-risk-btn" onclick="openRiskModal()">+ 등록</button>
@@ -1173,7 +1198,9 @@
                     <option>위험성평가</option>
                   </select>
                   <button class="btn btn-primary btn-sm" id="upload-doc-btn" onclick="openUploadModal()">📤 업로드</button>
+                  <button class="btn btn-primary btn-sm" id="restore-selected-btn" onclick="restoreSelectedDocs()" style="display:none;">🔄 선택 복원</button>
                   <button class="btn btn-danger btn-sm" onclick="deleteSelectedDocs()">🗑️ 선택 삭제</button>
+                  <button class="btn btn-secondary btn-sm" id="trash-toggle-btn" onclick="toggleTrashMode()" style="margin-left:auto;">🗑️ 휴지통 보기</button>
                 </div>
               </div>
             </div>
@@ -1398,6 +1425,10 @@
         <div class="modal-title" id="worker-modal-title">근로자 추가</div>
         <button class="modal-close" onclick="closeModal('modal-worker')">✕</button>
       </div>
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label>공사 선택 * (필수)</label>
+        <select class="form-control" id="worker-project" required></select>
+      </div>
       <div class="grid-2">
         <div class="form-group"><label>이름 *</label><input class="form-control" id="w-name" required></div>
         <div class="form-group"><label>직종</label><input class="form-control" id="w-job" placeholder="예: 철근공"></div>
@@ -1427,13 +1458,7 @@
       <div class="form-group"><label>일자 * (필수)</label><input class="form-control" type="date" id="daily-date"></div>
       <div class="form-group"><label>작업내용 * (필수)</label><textarea class="form-control" id="daily-content" rows="3" placeholder="금일 작업내용을 입력하세요"></textarea></div>
       <div class="form-group"><label>담당자 * (필수)</label><input class="form-control" id="daily-manager"></div>
-      <div class="form-group"><label>상태</label>
-        <select class="form-control" id="daily-status">
-          <option value="작업중">작업중</option>
-          <option value="완료">완료</option>
-          <option value="보류">보류</option>
-        </select>
-      </div>
+
       <div class="form-group" style="grid-column:1/-1;">
         <label>사진 (여러 장 선택 가능)</label>
         <input class="form-control" type="file" id="daily-photo" accept="image/*" multiple>
@@ -1451,6 +1476,10 @@
       <div class="modal-header">
         <div class="modal-title" id="tbm-modal-title">TBM 작성</div>
         <button class="modal-close" onclick="closeModal('modal-tbm')">✕</button>
+      </div>
+      <div class="form-group">
+        <label>공사 선택 * (필수)</label>
+        <select class="form-control" id="tbm-project"></select>
       </div>
       <div class="form-group"><label>날짜 *</label><input class="form-control" type="date" id="tbm-date"></div>
       <div class="form-group"><label>작업 내용 및 위험 요소 *</label><textarea class="form-control" id="tbm-hazards" rows="3"
@@ -1474,17 +1503,15 @@
         <div class="modal-title" id="wp-modal-title">작업계획서 작성</div>
         <button class="modal-close" onclick="closeModal('modal-wp')">✕</button>
       </div>
+      <div class="form-group">
+        <label>공사 선택 * (필수)</label>
+        <select class="form-control" id="wp-project"></select>
+      </div>
       <div class="form-group"><label>작업일 *</label><input class="form-control" type="date" id="wp-date"></div>
       <div class="form-group"><label>작업 내용 *</label><textarea class="form-control" id="wp-content" rows="3"></textarea>
       </div>
       <div class="form-group"><label>담당자</label><input class="form-control" id="wp-manager" placeholder="담당자명"></div>
-      <div class="form-group"><label>상태</label>
-        <select class="form-control" id="wp-status">
-          <option value="planned">계획</option>
-          <option value="in_progress">진행중</option>
-          <option value="completed">완료</option>
-        </select>
-      </div>
+      
       <div class="form-group" style="grid-column:1/-1;"><label>현장 사진 추가 (여러 장 선택 가능)</label><input class="form-control" type="file" id="wp-photo" accept="image/*" multiple></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-wp')">취소</button>
@@ -1596,7 +1623,7 @@
       <div class="form-group"><label>설명</label><textarea class="form-control" id="up-desc" rows="2"></textarea></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-upload')">취소</button>
-        <button class="btn btn-primary" onclick="uploadDoc()">업로드</button>
+        <button class="btn btn-primary" onclick="submitGlobalDocument(event)">업로드</button>
       </div>
     </div>
   </div>
@@ -1703,7 +1730,7 @@
       // 히스토리
       if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
       // 데이터 로드
-      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
       if (loaders[page]) loaders[page]();
       // 계정 관리는 관리자만
       if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
@@ -2003,14 +2030,14 @@
           api('/api/notices').catch(() => ({})),
           api('/api/project-info').catch(() => ({}))
         ]);
-        if (projData.project) {
-          document.getElementById('proj-name-label').textContent = projData.project.project_name || '공사명 미등록';
+        if (projData.projectInfo) {
+          document.getElementById('proj-name-label').textContent = projData.projectInfo.project_name || '공사명 미등록';
         }
         const s = statsData.stats || {};
-        document.getElementById('stat-docs').textContent = s.total_documents ?? '-';
-        document.getElementById('stat-workers').textContent = s.total_workers ?? '-';
-        document.getElementById('stat-tbm').textContent = s.total_tbm ?? '-';
-        document.getElementById('stat-workplans').textContent = s.total_workplans ?? '-';
+        document.getElementById('stat-docs').textContent = s.totalDocuments ?? '-';
+        document.getElementById('stat-workers').textContent = s.workerCount ?? '-';
+        document.getElementById('stat-tbm').textContent = s.tbmCount ?? '-';
+        document.getElementById('stat-workplans').textContent = s.workPlanCount ?? '-';
         
         const notices = (noticesData.notices || []).slice(0, 10);
         const tbody = document.getElementById('dash-notice-tbody');
@@ -2028,15 +2055,39 @@
     let projectDataList = [];
     let editingProjectId = null;
 
-    async function loadProjectDropdowns() {
+        async function loadProjectDropdowns() {
       try {
         const viewAs = document.getElementById('view-as-employee')?.value || '';
         const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
         const projects = data.projects || [];
-        const options = '<option value="all">전체 현장</option>' + projects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
-        ['filter-workers-project', 'filter-workplan-project', 'filter-tbm-project'].forEach(id => {
+        
+        // ONLY ACTIVE projects for the combo boxes!
+        const activeProjects = projects.filter(p => p.status !== 'completed');
+        
+        const activeOpts = activeProjects.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+        
+        let defaultId = '';
+        if (activeProjects.length > 0) defaultId = activeProjects[0].id;
+
+        const idsToUpdate = [
+            'filter-workers-project', 'filter-workplan-project', 'filter-daily-project', 
+            'filter-tbm-project', 'filter-risk-project',
+            'wp-project', 'daily-proj', 'tbm-project', 'risk-project', 'worker-project'
+        ];
+
+        idsToUpdate.forEach(id => {
           const el = document.getElementById(id);
-          if (el) el.innerHTML = options;
+          if (el) {
+            const oldVal = el.value;
+            el.innerHTML = activeOpts;
+            
+            const isValid = activeProjects.some(p => p.id === oldVal);
+            if (isValid) {
+                el.value = oldVal;
+            } else if (defaultId) {
+                el.value = defaultId;
+            }
+          }
         });
       } catch (e) { console.error('Project dropdown load failed', e); }
     }
@@ -2049,9 +2100,16 @@
         const container = document.getElementById('proj-view');
         const isAdmin = currentUser?.role === 'admin';
 
-        if (!projectDataList.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 공사 정보가 없습니다.</p></div>'; return; }
+        const activeProjects = projectDataList.filter(p => p.status !== 'completed');
+        const completedProjects = projectDataList.filter(p => p.status === 'completed');
         
-        container.innerHTML = projectDataList.map(p => {
+        const compContainer = document.getElementById('completed-proj-view');
+        
+        // Render Active Projects
+        if (container) {
+          if (!activeProjects.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 진행중 현장이 없습니다.</p></div>'; }
+          else {
+            container.innerHTML = activeProjects.map(p => {
           const canEdit = isAdmin || p.updated_by === currentUser?.name;
           return `
           <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);">
@@ -2059,6 +2117,7 @@
               <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
               ${canEdit ? `<div>
                 <button class="btn btn-secondary btn-sm" onclick="editProject('${p.id}')">✏️ 수정</button>
+                    <button class="btn btn-sm" style="background:#10b981;color:white;border:none;" onclick="completeProject(\'${p.id}\')">✅ 준공처리</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
               </div>` : ''}
             </div>
@@ -2070,7 +2129,33 @@
               <div style="grid-column:1/-1;"><label style="color:var(--text-muted);font-size:12px;">현장 주소</label><p style="margin-top:4px;font-size:13px;">${esc(p.location || p.site_address)}</p></div>
             </div>
           </div>`;
-        }).join('');
+            }).join('');
+          }
+        }
+        
+        // Render Completed Projects
+        if (compContainer) {
+          if (!completedProjects.length) { compContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>준공된 현장이 없습니다.</p></div>'; }
+          else {
+            compContainer.innerHTML = completedProjects.map(p => {
+              const canEdit = isAdmin || p.updated_by === currentUser?.name;
+              return `
+              <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);opacity:0.8;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+                  <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
+                  ${canEdit ? `<div>
+                    <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;" onclick="restoreProject('${p.id}')">🔄 진행중 복구</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
+                  </div>` : ''}
+                </div>
+                <div class="grid-2" style="gap:16px;">
+                  <div><label style="color:var(--text-muted);font-size:12px;">업체명 / 발주처</label><p style="margin-top:4px;font-size:14px;font-weight:600;">${esc(p.contractor_name || p.client_name || '-')}</p></div>
+                  <div><label style="color:var(--text-muted);font-size:12px;">공사 기간</label><p style="margin-top:4px;font-size:13px;">${esc(p.start_date)} ~ ${esc(p.end_date)}</p></div>
+                </div>
+              </div>`;
+            }).join('');
+          }
+        }
       } catch (e) { toast('공사정보 로딩 실패: ' + e.message, 'error'); }
     }
 
@@ -2094,7 +2179,8 @@
     </tr>`).join('');
       } catch (e) { toast('근로자 로딩 실패: ' + e.message, 'error'); }
     }
-    function openWorkerModal(id) {
+    async function openWorkerModal(id) {
+      await loadProjectDropdowns();
       editingWorkerId = id;
       document.getElementById('worker-modal-title').textContent = id ? '근로자 수정' : '근로자 추가';
       ['w-name', 'w-job', 'w-nation', 'w-hire', 'w-note'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
@@ -2113,6 +2199,7 @@
     async function saveWorker() {
       const body = {
         userId: currentUser?.id,
+        project_id: document.getElementById('worker-project').value,
         name: document.getElementById('w-name').value.trim(),
         job_type: document.getElementById('w-job').value.trim(),
         nationality: document.getElementById('w-nation').value.trim(),
@@ -2148,23 +2235,22 @@
         const list = data.daily_reports || [];
         const tbody = document.getElementById('daily-tbody');
         const canEdit = currentUser?.role === 'admin';
-        if (!list.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📰</div><p>작업일보 내역이 없습니다.</p></div></td></tr>`; return; }
+        if (!list.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📰</div><p>작업일보 내역이 없습니다.</p></div></td></tr>`; return; }
         
         tbody.innerHTML = list.map(d => {
           const imgs = (d.image_path || '').split(',').filter(x => x.trim());
           return `<tr>
-            <td class="fw-600">${esc(d.work_date)}</td>
-            <td style="white-space:pre-wrap;">${esc(d.work_content)}</td>
-            <td class="td-muted">${esc(d.manager_name)}</td>
-            <td>
-              <span class="badge ${d.status === '완료' ? 'badge-success' : 'badge-amber'}">${esc(d.status)}</span>
+            <td class="fw-600" style="white-space:nowrap;">${esc(d.work_date)}
+              <div style="font-size:11px;color:var(--text-muted);font-weight:normal;">작성: ${fmtDate(d.created_at)}</div>
             </td>
+            <td>${esc((d.work_content || '').slice(0, 80))}</td>
+            <td class="td-muted">${fmtAuthor(d.manager_name)}</td>
             <td>
               ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
                 <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
-                  <img src="/uploads/${encodeURIComponent(img.trim())}" alt="사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
+                  <img src="/uploads/${encodeURIComponent(img.trim())}" alt="작업 사진" style="max-width:60px;max-height:50px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="openLightbox('/uploads/${encodeURIComponent(img.trim())}')"/>
                   <a href="/uploads/${encodeURIComponent(img.trim())}/download" style="font-size:11px;color:var(--accent);text-decoration:none;">⬇️</a>
-                </div>`).join('') + `</div>` : '-'}
+                </div>`).join('') + `</div>` : ''}
             </td>
             <td>
               <div class="td-actions" style="display:inline-flex;">
@@ -2177,11 +2263,11 @@
       } catch (e) { toast('작업일보 로딩 실패: ' + e.message, 'error'); }
     }
     
-    function openDailyModal(id, pId, date, content, manager, status) {
+    async function openDailyModal(id, pId, date, content, manager, status) {
+      await loadProjectDropdowns();
       editingDailyId = id;
       document.getElementById('daily-modal-title').textContent = id ? '작업일보 수정' : '작업일보 추가';
-      const sel = document.getElementById('daily-proj');
-      sel.innerHTML = projectDataList.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+
       
       const today = new Date();
       const y = today.getFullYear();
@@ -2192,7 +2278,6 @@
       document.getElementById('daily-date').value = date || `${y}-${m}-${d}`;
       document.getElementById('daily-content').value = content || '';
       document.getElementById('daily-manager').value = manager || '';
-      document.getElementById('daily-status').value = status || '작업중';
       document.getElementById('daily-photo').value = '';
       
       openModal('modal-daily');
@@ -2203,7 +2288,7 @@
       const date = document.getElementById('daily-date').value;
       const content = document.getElementById('daily-content').value.trim();
       const manager = document.getElementById('daily-manager').value.trim();
-      const status = document.getElementById('daily-status').value;
+      
       
       if (!projId || !date || !content || !manager) { toast('필수 항목을 모두 입력하세요.', 'error'); return; }
       
@@ -2213,7 +2298,8 @@
         fd.append('work_date', date);
         fd.append('work_content', content);
         fd.append('manager_name', manager);
-        fd.append('status', status);
+        
+        fd.append('projectId', projId);
         fd.append('userId', currentUser?.id || '');
         
         const photoInput = document.getElementById('daily-photo');
@@ -2232,7 +2318,7 @@
         
         toast(editingDailyId ? '수정되었습니다.' : '저장되었습니다.', 'success');
         closeModal('modal-daily'); loadDailyReports();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { console.error(e); alert('업로드 실패: ' + e.message); toast(e.message, 'error'); }
     }
     
     function delDailyReport(id) {
@@ -2276,7 +2362,8 @@
         }).join('');
       } catch (e) { toast('TBM 로딩 실패: ' + e.message, 'error'); }
     }
-    function openTbmModal(id) {
+    async function openTbmModal(id) {
+      await loadProjectDropdowns();
       editingTbmId = id;
       document.getElementById('tbm-modal-title').textContent = id ? 'TBM 수정' : 'TBM 작성';
       ['tbm-date', 'tbm-hazards', 'tbm-measures', 'tbm-notes'].forEach(i => document.getElementById(i).value = '');
@@ -2293,6 +2380,7 @@
       openModal('modal-tbm');
     }
     async function saveTbm() {
+      const projId = document.getElementById('tbm-project').value;
       const date = document.getElementById('tbm-date').value;
       const hazards = document.getElementById('tbm-hazards').value.trim();
       const measures = document.getElementById('tbm-measures').value.trim();
@@ -2300,6 +2388,7 @@
       if (!hazards || !measures) { toast('필수 항목을 입력하세요.', 'error'); return; }
       try {
         const fd = new FormData();
+        fd.append('projectId', projId);
         fd.append('userId', currentUser?.id || '');
         fd.append('created_date', date);
         fd.append('work_details_hazards', hazards);
@@ -2324,7 +2413,7 @@
 
         toast(editingTbmId ? '수정되었습니다.' : '작성되었습니다.', 'success');
         closeModal('modal-tbm'); loadTbmList();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { console.error(e); alert('업로드 실패: ' + e.message); toast(e.message, 'error'); }
     }
     function delTbm(id) {
       confirm2('TBM 삭제', 'TBM 일지를 삭제하시겠습니까?', async () => {
@@ -2364,12 +2453,12 @@
       } catch (e) { toast('위험성평가 로딩 실패: ' + e.message, 'error'); }
     }
     
-    function openRiskModal() {
+    async function openRiskModal() {
+      await loadProjectDropdowns();
       ['risk-date', 'risk-evaluator', 'risk-task', 'risk-content', 'risk-file'].forEach(i => document.getElementById(i).value = '');
       document.getElementById('risk-date').value = new Date().toISOString().slice(0, 10);
       
-      const projSelect = document.getElementById('risk-project');
-      projSelect.innerHTML = projectDataList.map(p => `<option value="${p.id}">${esc(p.project_name)}</option>`).join('');
+
       
       openModal('modal-add-risk');
     }
@@ -2392,6 +2481,7 @@
         fd.append('evaluator', evaluator);
         fd.append('taskName', task);
         fd.append('content', content);
+        fd.append('projectId', projId);
         fd.append('userId', currentUser?.id || '');
         
         if (fileInput && fileInput.files && fileInput.files[0]) {
@@ -2405,7 +2495,7 @@
         toast(data.message || '등록되었습니다.', 'success');
         closeModal('modal-add-risk');
         loadRiskAssessments();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { console.error(e); alert('업로드 실패: ' + e.message); toast(e.message, 'error'); }
     }
     
     function delRisk(id) {
@@ -2446,19 +2536,19 @@
         }).join('');
       } catch (e) { toast('작업계획서 로딩 실패: ' + e.message, 'error'); }
     }
-    function openWpModal(id) {
+    async function openWpModal(id) {
+      await loadProjectDropdowns();
       editingWpId = id;
       document.getElementById('wp-modal-title').textContent = id ? '작업계획서 수정' : '작업계획서 작성';
       ['wp-date', 'wp-content', 'wp-manager'].forEach(i => document.getElementById(i).value = '');
       document.getElementById('wp-date').value = new Date().toISOString().slice(0, 10);
-      document.getElementById('wp-status').value = 'planned';
+
       if (id) {
         api(`/api/workplans/${id}?userId=${currentUser?.id}`).then(data => {
           const w = data.work_plan;
           document.getElementById('wp-date').value = w.work_date || '';
           document.getElementById('wp-content').value = w.work_content || '';
           document.getElementById('wp-manager').value = w.manager_name || '';
-          document.getElementById('wp-status').value = w.status || 'planned';
         }).catch(e => toast(e.message, 'error'));
       }
       openModal('modal-wp');
@@ -2467,16 +2557,17 @@
       const date = document.getElementById('wp-date').value;
       const content = document.getElementById('wp-content').value.trim();
       const manager = document.getElementById('wp-manager').value.trim();
-      const status = document.getElementById('wp-status').value;
+      const projId = document.getElementById('wp-project').value;
       
       if (!content) { toast('작업 내용을 입력하세요.', 'error'); return; }
       try {
         const fd = new FormData();
+        fd.append('projectId', projId);
         fd.append('userId', currentUser?.id || '');
         fd.append('work_date', date);
         fd.append('work_content', content);
         fd.append('manager_name', manager);
-        fd.append('status', status);
+        
 
         const photoInput = document.getElementById('wp-photo');
         if (photoInput && photoInput.files) {
@@ -2494,7 +2585,7 @@
 
         toast(editingWpId ? '수정되었습니다.' : '작성되었습니다.', 'success');
         closeModal('modal-wp'); loadWorkplans();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { console.error(e); alert('업로드 실패: ' + e.message); toast(e.message, 'error'); }
     }
     function delWp(id) {
       confirm2('작업계획서 삭제', '작업계획서를 삭제하시겠습니까?', async () => {
@@ -2533,6 +2624,7 @@
       if (!title) { toast('제목을 입력하세요.', 'error'); return; }
       try {
         const fd = new FormData();
+        fd.append('projectId', projId);
         fd.append('userId', currentUser?.id || '');
         fd.append('title', title);
         fd.append('content', document.getElementById('notice-content').value.trim());
@@ -2560,6 +2652,18 @@
       ['np-name','np-contractor','np-start','np-end','np-amount','np-manager','np-location'].forEach(id => document.getElementById(id).value=''); 
       openModal('modal-add-project');
     }
+    function completeProject(id) {
+      confirm2('준공 처리', '이 현장을 준공 처리하시겠습니까?', async () => {
+        try { await api(`/api/projects/${id}/status`, { method: 'PATCH', body: JSON.stringify({ userId: currentUser?.id, status: 'completed' }) }); toast('준공 처리됨', 'success'); loadProjectInfo(); } catch (e) { toast(e.message, 'error'); }
+      }, '✅ 준공 처리', 'btn-primary');
+    }
+    
+    function restoreProject(id) {
+      confirm2('복원', '이 현장을 다시 진행중 상태로 복원하시겠습니까?', async () => {
+        try { await api(`/api/projects/${id}/status`, { method: 'PATCH', body: JSON.stringify({ userId: currentUser?.id, status: 'active' }) }); toast('복원 처리됨', 'success'); loadProjectInfo(); } catch (e) { toast(e.message, 'error'); }
+      }, '🔄 복원', 'btn-secondary');
+    }
+
     function editProject(id) {
       editingProjectId = id;
       const p = projectDataList.find(x => x.id === id);
@@ -2582,7 +2686,7 @@
       const amount = document.getElementById('np-amount').value.trim();
       const manager = document.getElementById('np-manager').value.trim();
       const location = document.getElementById('np-location').value.trim();
-      if (!name || !contractor || !start || !end || !amount || !manager || !location) {
+      if (!name || !contractor || !start || !end || !manager || !location) {
         toast('필수 항목을 모두 입력하세요.', 'error'); return;
       }
       try {
@@ -2605,9 +2709,24 @@
     }
 
     // ── Docs ──────────────────────────────────────────────────
+    let isTrashMode = false;
+    
+    function toggleTrashMode() {
+      isTrashMode = !isTrashMode;
+      document.getElementById('trash-toggle-btn').innerHTML = isTrashMode ? '🔙 휴지통 닫기' : '🗑️ 휴지통 보기';
+      
+      const restoreBtn = document.getElementById('restore-selected-btn');
+      if (restoreBtn) {
+          restoreBtn.style.display = isTrashMode ? 'inline-block' : 'none';
+      }
+      
+      loadDocs();
+    }
+    
     async function loadDocs() {
       try {
-        const data = await api(`/api/documents?userId=${currentUser?.id || ''}`);
+        const deletedQuery = isTrashMode ? '&deleted=true' : '';
+        const data = await api(`/api/documents?userId=${currentUser?.id || ''}${deletedQuery}`);
         allDocs = data.documents || [];
         renderDocs(allDocs);
       } catch (e) { toast('문서 로딩 실패: ' + e.message, 'error'); }
@@ -2620,50 +2739,112 @@
     function renderDocs(list) {
       const tbody = document.getElementById('docs-tbody');
       const canEdit = currentUser?.role === 'admin';
-      if (!list.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📁</div><p>문서가 없습니다.</p></div></td></tr>`; return; }
+      
+      if (!list.length) { 
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📁</div><p>${isTrashMode ? '휴지통이 비어 있습니다.' : '문서가 없습니다.'}</p></div></td></tr>`; 
+        return; 
+      }
       tbody.innerHTML = list.map(d => `<tr>
     <td style="text-align:center;"><input type="checkbox" class="doc-checkbox" value="${d.id}"></td>
     <td><a href="/uploads/${esc(d.file_path)}" target="_blank" style="color:var(--accent);text-decoration:none;">📄 ${esc(d.title)}</a></td>
     <td><span class="badge badge-blue">${esc(d.category) || '-'}</span></td>
     <td class="td-muted">${fmtAuthor(d.uploader_name)}</td>
     <td class="td-muted" style="white-space:nowrap;">${fmtDate(d.created_at)}</td>
-    <td>${canEdit ? `<button class="btn btn-danger btn-sm" onclick="delDoc('${d.id}','${esc(d.title)}')">🗑️</button>` : '-'}</td>
+    <td>${canEdit ? (isTrashMode ? 
+      `<div class="td-actions" style="display:inline-flex;">
+         <button class="btn btn-secondary btn-sm" onclick="restoreDoc('${d.id}')">🔄</button>
+         <button class="btn btn-danger btn-sm" onclick="hardDelDoc('${d.id}','${esc(d.title)}')">❌</button>
+       </div>` :
+      `<button class="btn btn-danger btn-sm" onclick="delDoc('${d.id}','${esc(d.title)}')">🗑️</button>`
+    ) : '-'}</td>
   </tr>`).join('');
-      if (!canEdit) document.getElementById('upload-doc-btn').style.display = 'none';
+      
+      const upBtn = document.getElementById('upload-doc-btn');
+      if (upBtn) {
+          upBtn.style.display = (canEdit && !isTrashMode) ? 'inline-block' : 'none';
+      }
     }
     function openUploadModal() { openModal('modal-upload'); }
     async function uploadDoc() {
-      const file = document.getElementById('up-file').files[0];
-      const title = document.getElementById('up-title').value.trim();
-      if (!file || !title) { toast('문서명과 파일을 선택하세요.', 'error'); return; }
+      const fileInput = document.getElementById('up-file');
+      const file = fileInput ? fileInput.files[0] : null;
+      if (!file) { alert('파일을 선택해주세요.'); return; }
+      const titleInput = document.getElementById('up-title');
+      const title = titleInput ? titleInput.value.trim() : '';
+      if (!title) { alert('문서명을 입력해주세요.'); return; }
+
       const fd = new FormData();
       fd.append('file', file);
       fd.append('title', title);
-      fd.append('category', document.getElementById('up-cat').value);
-      fd.append('description', document.getElementById('up-desc').value);
+      const catInput = document.getElementById('up-cat');
+      fd.append('category', catInput ? catInput.value : '');
+      const descInput = document.getElementById('up-desc');
+      fd.append('description', descInput ? descInput.value : '');
+      fd.append('projectId', projId || '');
       fd.append('userId', currentUser?.id || '');
+      
+      console.log("전송할 데이터:", Array.from(fd.entries()));
+
       try {
         const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) {
+            alert("업로드 실패: " + (data.error || '알 수 없는 서버 에러'));
+            return;
+        }
         toast('업로드 완료', 'success'); closeModal('modal-upload'); loadDocs();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { 
+        console.error(e); 
+        alert('업로드 실패: ' + e.message); 
+      }
     }
     async function deleteSelectedDocs() {
       const cbs = document.querySelectorAll('#docs-tbody .doc-checkbox:checked');
       if (!cbs.length) { toast('삭제할 문서를 선택하세요.', 'error'); return; }
       const ids = Array.from(cbs).map(cb => cb.value);
-      confirm2('선택 삭제', `선택한 ${ids.length}개의 문서를 영구 삭제하시겠습니까?`, async () => {
+      
+      const title = isTrashMode ? '영구 삭제' : '선택 삭제';
+      const msg = isTrashMode ? `선택한 ${ids.length}개의 문서를 영구 삭제하시겠습니까?\n(이 작업은 되돌릴 수 없습니다!)` : `선택한 ${ids.length}개의 문서를 휴지통으로 이동하시겠습니까?`;
+      
+      confirm2(title, msg, async () => {
         try {
-          const data = await api('/api/documents/delete-multiple', { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id, docIds: ids }) });
-          toast('삭제되었습니다.', 'success'); loadDocs();
+          const body = { userId: currentUser?.id, docIds: ids };
+          if (isTrashMode) body.hard = true;
+          const data = await api('/api/documents/delete-multiple', { method: 'DELETE', body: JSON.stringify(body) });
+          toast(isTrashMode ? '영구 삭제되었습니다.' : '삭제되었습니다.', 'success'); loadDocs();
         } catch (e) { toast(e.message, 'error'); }
-      }, '🗑️ 삭제 확인', 'btn-danger');
+      }, '🗑️ 확인', 'btn-danger');
     }
     function delDoc(id, title) {
       confirm2('문서 삭제', `"${title}" 문서를 삭제하시겠습니까?`, async () => {
         try { await api(`/api/documents/${id}`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('삭제됨', 'success'); loadDocs(); } catch (e) { toast(e.message, 'error'); }
       }, '삭제 확인', 'btn-danger');
+    }
+    
+    async function restoreSelectedDocs() {
+      const cbs = document.querySelectorAll('#docs-tbody .doc-checkbox:checked');
+      if (!cbs.length) { toast('복원할 문서를 선택하세요.', 'error'); return; }
+      const ids = Array.from(cbs).map(cb => cb.value);
+      
+      confirm2('선택 복원', `선택한 ${ids.length}개의 문서를 복원하시겠습니까?`, async () => {
+        try {
+          const body = { userId: currentUser?.id, docIds: ids };
+          const data = await api('/api/documents/bulk-restore', { method: 'POST', body: JSON.stringify(body) });
+          toast('복원되었습니다.', 'success'); loadDocs();
+        } catch (e) { toast(e.message, 'error'); }
+      }, '🔄 확인', 'btn-primary');
+    }
+    
+    function restoreDoc(id) {
+      confirm2('문서 복원', '이 문서를 다시 정상 목록으로 복원하시겠습니까?', async () => {
+        try { await api(`/api/documents/${id}/restore`, { method: 'POST', body: JSON.stringify({ userId: currentUser?.id }) }); toast('복원됨', 'success'); loadDocs(); } catch (e) { toast(e.message, 'error'); }
+      }, '복원 확인', 'btn-primary');
+    }
+    
+    function hardDelDoc(id, title) {
+      confirm2('영구 삭제', `"${title}" 문서를 영구 삭제하시겠습니까?\n(이 작업은 되돌릴 수 없습니다!)`, async () => {
+        try { await api(`/api/documents/${id}?hard=true`, { method: 'DELETE', body: JSON.stringify({ userId: currentUser?.id }) }); toast('영구 삭제됨', 'success'); loadDocs(); } catch (e) { toast(e.message, 'error'); }
+      }, '영구 삭제 확인', 'btn-danger');
     }
 
     // ── Audit Log ─────────────────────────────────────────────
@@ -2720,7 +2901,7 @@
     function onViewAsChange() {
       const page = document.querySelector('.page.active')?.id?.replace('page-', '');
       if (page) {
-        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
         if (loaders[page]) loaders[page]();
       }
     }
@@ -2734,7 +2915,49 @@
         else if (ep && ep.classList.contains('active')) doLogin('employee');
       }
     });
-  </script>
+  
+    // 전역 함수 선언 및 최상단 확인 팝업
+    window.submitGlobalDocument = async function(event) {
+      event.preventDefault();
+      
+      const fileInput = document.getElementById('up-file');
+      const file = fileInput ? fileInput.files[0] : null;
+      if (!file) { alert('파일을 선택해주세요.'); return; }
+      
+      const titleInput = document.getElementById('up-title');
+      const title = titleInput ? titleInput.value.trim() : '';
+      if (!title) { alert('문서명을 입력해주세요.'); return; }
+
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('title', title);
+      const catInput = document.getElementById('up-cat');
+      fd.append('category', catInput ? catInput.value : '');
+      const descInput = document.getElementById('up-desc');
+      fd.append('description', descInput ? descInput.value : '');
+      
+      // projectId is not required or can be empty string for global docs
+      fd.append('projectId', '');
+      
+      // Get userId from the global user info if it exists
+      const currentUserId = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : '';
+      fd.append('userId', currentUserId);
+
+      try {
+        const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+            alert("업로드 실패: " + (data.error || '알 수 없는 에러'));
+            return;
+        }
+        if (typeof closeModal === 'function') closeModal('modal-upload');
+        if (typeof loadDocs === 'function') loadDocs();
+      } catch (e) {
+        console.error(e);
+        alert('업로드 실패: ' + e.message);
+      }
+    };
+</script>
 </body>
 
 </html>

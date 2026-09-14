@@ -182,6 +182,11 @@ def _migrate(conn):
         )
     """)
 
+    # 문서 관리 휴지통 (소프트 삭제) 마이그레이션
+    doc_cols = {row[1] for row in c.execute("PRAGMA table_info(documents)").fetchall()}
+    if 'is_deleted' not in doc_cols:
+        c.execute("ALTER TABLE documents ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT 0")
+
     conn.commit()
 
 
@@ -347,6 +352,7 @@ def init_db():
             sub_category        TEXT NOT NULL DEFAULT '',
             category            TEXT NOT NULL DEFAULT '',
             tags                TEXT NOT NULL DEFAULT '[]',
+            is_deleted          BOOLEAN NOT NULL DEFAULT 0,
             uploader_id         TEXT NOT NULL,
             uploader_name       TEXT NOT NULL,
             uploader_role       TEXT NOT NULL DEFAULT 'employee',

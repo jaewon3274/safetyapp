@@ -92,7 +92,7 @@
       // 히스토리
       if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
       // 데이터 로드
-      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+      const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
       if (loaders[page]) loaders[page]();
       // 계정 관리는 관리자만
       if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
@@ -430,6 +430,19 @@
       } catch (e) { console.error('Project dropdown load failed', e); }
     }
     
+    
+    function completeProject(id) {
+      confirm2('준공 처리', '이 현장을 준공 처리하시겠습니까?', async () => {
+        try { await api(`/api/projects/${id}/status`, { method: 'PATCH', body: JSON.stringify({ userId: currentUser?.id, status: 'completed' }) }); toast('준공 처리됨', 'success'); loadProjectInfo(); } catch (e) { toast(e.message, 'error'); }
+      }, '준공 처리', 'btn-primary');
+    }
+    
+    function restoreProject(id) {
+      confirm2('진행중 복구', '이 현장을 다시 진행중으로 복구하시겠습니까?', async () => {
+        try { await api(`/api/projects/${id}/status`, { method: 'PATCH', body: JSON.stringify({ userId: currentUser?.id, status: 'active' }) }); toast('복구됨', 'success'); loadProjectInfo(); } catch (e) { toast(e.message, 'error'); }
+      }, '진행중 복구', 'btn-primary');
+    }
+
     async function loadProjectInfo() {
       try {
         const viewAs = document.getElementById('view-as-employee')?.value || '';
@@ -438,39 +451,62 @@
         const container = document.getElementById('proj-view');
         const isAdmin = currentUser?.role === 'admin';
 
-        if (!projectDataList.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 공사 정보가 없습니다.</p></div>'; return; }
+        const activeProjects = projectDataList.filter(p => p.status !== 'completed');
+        const completedProjects = projectDataList.filter(p => p.status === 'completed');
         
-        container.innerHTML = projectDataList.map(p => {
-          const canEdit = isAdmin || p.updated_by === currentUser?.name;
-          return `
-          <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);">
-            <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
-              <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
-              ${canEdit ? `<div>
-                <button class="btn btn-secondary btn-sm" onclick="editProject('${p.id}')">✏️ 수정</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
-              </div>` : ''}
-            </div>
-            <div class="grid-2" style="gap:16px;">
-              <div><label style="color:var(--text-muted);font-size:12px;">업체명 / 발주처</label><p style="margin-top:4px;font-size:14px;font-weight:600;">${esc(p.contractor_name || p.client_name || '-')}</p></div>
-              <div><label style="color:var(--text-muted);font-size:12px;">공사 기간</label><p style="margin-top:4px;font-size:13px;">${esc(p.start_date)} ~ ${esc(p.end_date)}</p></div>
-              <div><label style="color:var(--text-muted);font-size:12px;">공사 금액</label><p style="margin-top:4px;font-size:13px;">${esc(p.contract_amount)}</p></div>
-              <div><label style="color:var(--text-muted);font-size:12px;">공사담당자</label><p style="margin-top:4px;font-size:13px;">${esc(p.site_manager)}</p></div>
-              <div style="grid-column:1/-1;"><label style="color:var(--text-muted);font-size:12px;">현장 주소</label><p style="margin-top:4px;font-size:13px;">${esc(p.location || p.site_address)}</p></div>
-            </div>
-          </div>`;
-        }).join('');
-      
-        // Populate all project selectors
-        const filters = document.querySelectorAll('.project-selector-filter');
-        const inputs = document.querySelectorAll('.project-selector-input');
-        const opts = data.projects.map(p => `<option value="${p.id}">${p.project_name}</option>`).join('');
-        filters.forEach(f => {
-          const val = f.value;
-          f.innerHTML = `<option value="all">전체 현장</option>` + opts;
-          if (val) f.value = val;
-        });
-        inputs.forEach(i => i.innerHTML = opts);
+        const compContainer = document.getElementById('completed-proj-view');
+        
+        // Render Active Projects
+        if (container) {
+          if (!activeProjects.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏗️</div><p>등록된 진행중 현장이 없습니다.</p></div>'; }
+          else {
+            container.innerHTML = activeProjects.map(p => {
+              const canEdit = isAdmin || p.updated_by === currentUser?.name;
+              return `
+              <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+                  <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
+                  ${canEdit ? `<div>
+                    <button class="btn btn-secondary btn-sm" onclick="editProject('${p.id}')">✏️ 수정</button>
+                    <button class="btn btn-sm" style="background:#10b981;color:white;border:none;" onclick="completeProject('${p.id}')">✅ 준공처리</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
+                  </div>` : ''}
+                </div>
+                <div class="grid-2" style="gap:16px;">
+                  <div><label style="color:var(--text-muted);font-size:12px;">업체명 / 발주처</label><p style="margin-top:4px;font-size:14px;font-weight:600;">${esc(p.contractor_name || p.client_name || '-')}</p></div>
+                  <div><label style="color:var(--text-muted);font-size:12px;">공사 기간</label><p style="margin-top:4px;font-size:13px;">${esc(p.start_date)} ~ ${esc(p.end_date)}</p></div>
+                  <div><label style="color:var(--text-muted);font-size:12px;">공사 금액</label><p style="margin-top:4px;font-size:13px;">${esc(p.contract_amount)}</p></div>
+                  <div><label style="color:var(--text-muted);font-size:12px;">공사담당자</label><p style="margin-top:4px;font-size:13px;">${esc(p.site_manager)}</p></div>
+                  <div style="grid-column:1/-1;"><label style="color:var(--text-muted);font-size:12px;">현장 주소</label><p style="margin-top:4px;font-size:13px;">${esc(p.location || p.site_address)}</p></div>
+                </div>
+              </div>`;
+            }).join('');
+          }
+        }
+        
+        // Render Completed Projects
+        if (compContainer) {
+          if (!completedProjects.length) { compContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>준공된 현장이 없습니다.</p></div>'; }
+          else {
+            compContainer.innerHTML = completedProjects.map(p => {
+              const canEdit = isAdmin || p.updated_by === currentUser?.name;
+              return `
+              <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;background:var(--bg-panel);opacity:0.8;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center;">
+                  <h4 style="margin:0;color:var(--text-primary);font-size:16px;">${esc(p.project_name)}</h4>
+                  ${canEdit ? `<div>
+                    <button class="btn btn-sm" style="background:#f59e0b;color:white;border:none;" onclick="restoreProject('${p.id}')">🔄 진행중 복구</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑️ 삭제</button>
+                  </div>` : ''}
+                </div>
+                <div class="grid-2" style="gap:16px;">
+                  <div><label style="color:var(--text-muted);font-size:12px;">업체명 / 발주처</label><p style="margin-top:4px;font-size:14px;font-weight:600;">${esc(p.contractor_name || p.client_name || '-')}</p></div>
+                  <div><label style="color:var(--text-muted);font-size:12px;">공사 기간</label><p style="margin-top:4px;font-size:13px;">${esc(p.start_date)} ~ ${esc(p.end_date)}</p></div>
+                </div>
+              </div>`;
+            }).join('');
+          }
+        }
       } catch (e) { toast('공사정보 로딩 실패: ' + e.message, 'error'); }
     }
 
@@ -556,9 +592,7 @@
             <td class="fw-600">${esc(d.work_date)}</td>
             <td style="white-space:pre-wrap;">${esc(d.work_content)}</td>
             <td class="td-muted">${esc(d.manager_name)}</td>
-            <td>
-              <span class="badge ${d.status === '완료' ? 'badge-success' : 'badge-amber'}">${esc(d.status)}</span>
-            </td>
+
             <td>
               ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
                 <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
@@ -592,7 +626,7 @@
       document.getElementById('daily-date').value = date || `${y}-${m}-${d}`;
       document.getElementById('daily-content').value = content || '';
       document.getElementById('daily-manager').value = manager || '';
-      document.getElementById('daily-status').value = status || '작업중';
+      
       document.getElementById('daily-photo').value = '';
       
       openModal('modal-daily');
@@ -615,7 +649,6 @@
         fd.append('manager_name', manager);
         fd.append('status', status);
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         
         const photoInput = document.getElementById('daily-photo');
         if (photoInput && photoInput.files) {
@@ -702,7 +735,6 @@
       try {
         const fd = new FormData();
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         fd.append('created_date', date);
         fd.append('work_details_hazards', hazards);
         fd.append('safety_measures', measures);
@@ -795,7 +827,6 @@
         fd.append('taskName', task);
         fd.append('content', content);
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         
         if (fileInput && fileInput.files && fileInput.files[0]) {
           fd.append('file', fileInput.files[0]);
@@ -836,7 +867,6 @@
       </td>
       <td>${esc((w.work_content || '').slice(0, 80))}</td>
       <td class="td-muted">${fmtAuthor(w.manager_name)}</td>
-      <td>${statusLabel[w.status] || w.status}</td>
       <td>
         ${imgs.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">` + imgs.map(img => `
           <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
@@ -854,14 +884,14 @@
       document.getElementById('wp-modal-title').textContent = id ? '작업계획서 수정' : '작업계획서 작성';
       ['wp-date', 'wp-content', 'wp-manager'].forEach(i => document.getElementById(i).value = '');
       document.getElementById('wp-date').value = new Date().toISOString().slice(0, 10);
-      document.getElementById('wp-status').value = 'planned';
+      
       if (id) {
         api(`/api/workplans/${id}?userId=${currentUser?.id}`).then(data => {
           const w = data.work_plan;
           document.getElementById('wp-date').value = w.work_date || '';
           document.getElementById('wp-content').value = w.work_content || '';
           document.getElementById('wp-manager').value = w.manager_name || '';
-          document.getElementById('wp-status').value = w.status || 'planned';
+          
         }).catch(e => toast(e.message, 'error'));
       }
       openModal('modal-wp');
@@ -876,8 +906,6 @@
       try {
         const fd = new FormData();
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
-      fd.append('projectId', document.getElementById('wp-project').value);
         fd.append('work_date', date);
         fd.append('work_content', content);
         fd.append('manager_name', manager);
@@ -939,7 +967,6 @@
       try {
         const fd = new FormData();
         fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
         fd.append('title', title);
         fd.append('content', document.getElementById('notice-content').value.trim());
         const fileInput = document.getElementById('notice-file');
@@ -988,7 +1015,7 @@
       const amount = document.getElementById('np-amount').value.trim();
       const manager = document.getElementById('np-manager').value.trim();
       const location = document.getElementById('np-location').value.trim();
-      if (!name || !contractor || !start || !end || !manager || !location) {
+      if (!name || !contractor || !start || !end || !amount || !manager || !location) {
         toast('필수 항목을 모두 입력하세요.', 'error'); return;
       }
       try {
@@ -1048,7 +1075,6 @@
       fd.append('category', document.getElementById('up-cat').value);
       fd.append('description', document.getElementById('up-desc').value);
       fd.append('userId', currentUser?.id || '');
-      fd.append('projectId', document.getElementById('wp-project').value);
       try {
         const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
         const data = await res.json();
@@ -1127,7 +1153,7 @@
     function onViewAsChange() {
       const page = document.querySelector('.page.active')?.id?.replace('page-', '');
       if (page) {
-        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
+        const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
         if (loaders[page]) loaders[page]();
       }
     }
