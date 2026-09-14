@@ -2255,7 +2255,13 @@ def get_projects_simple():
     try:
         projects = rows_to_list(db.execute("SELECT * FROM projects ORDER BY updated_at DESC").fetchall())
         user_id = request.args.get('userId', '').strip()
+        view_as = request.args.get('viewAsUserId', '').strip()
         user = get_user(user_id) if user_id else None
+        
+        # [관리자 뷰 모드]
+        if user and user.get('role') == 'admin' and view_as:
+            user = get_user(view_as)
+
         if user and user.get('role') != 'admin':
             assigned = get_user_assigned_project_ids(user['id'])
             if assigned is not None:
@@ -2456,13 +2462,33 @@ def delete_notice(nid):
 # ── RISK ASSESSMENTS API ──────────────────────────────────────
 @app.route('/api/risk-assessments', methods=['GET'])
 def get_risk_assessments():
+    user_id = request.args.get('userId', '').strip()
     project_id = request.args.get('projectId', 'all')
     db = get_db()
     try:
-        if project_id == 'all':
-            rows = db.execute("SELECT * FROM risk_assessments WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed') ORDER BY eval_date DESC").fetchall()
+        sql = "SELECT * FROM risk_assessments WHERE project_id IN (SELECT id FROM projects WHERE status != 'completed')"
+        params = []
+        assigned = get_user_assigned_project_ids(user_id) if user_id else None
+        if assigned is not None:
+            if project_id and project_id != 'all':
+                if project_id not in assigned:
+                    sql += " AND 1=0"
+                else:
+                    sql += " AND project_id=?"
+                    params.append(project_id)
+            else:
+                if len(assigned) == 0:
+                    sql += " AND 1=0"
+                else:
+                    placeholders = ','.join('?' * len(assigned))
+                    sql += f" AND project_id IN ({placeholders})"
+                    params.extend(assigned)
         else:
-            rows = db.execute("SELECT * FROM risk_assessments WHERE project_id=? AND project_id IN (SELECT id FROM projects WHERE status != 'completed') ORDER BY eval_date DESC", (project_id,)).fetchall()
+            if project_id and project_id != 'all':
+                sql += " AND project_id=?"
+                params.append(project_id)
+        sql += " ORDER BY eval_date DESC"
+        rows = db.execute(sql, params).fetchall()
         
         result = []
         for r in rows:

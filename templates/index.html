@@ -1433,7 +1433,7 @@
         <div class="form-group"><label>이름 *</label><input class="form-control" id="w-name" required></div>
         <div class="form-group"><label>직종</label><input class="form-control" id="w-job" placeholder="예: 철근공"></div>
         <div class="form-group"><label>국적</label><input class="form-control" id="w-nation" placeholder="예: 한국"></div>
-        <div class="form-group"><label>입사일</label><input class="form-control" type="date" id="w-hire"></div>
+        <div class="form-group"><label>입사일</label><input class="form-control" type="date" id="w-hire" min="1900-01-01" max="9999-12-31"></div>
       </div>
       <div class="form-group"><label>특이사항</label><textarea class="form-control" id="w-note" rows="2"></textarea></div>
       <div class="modal-footer">
@@ -1455,9 +1455,9 @@
         <label>공사 선택 * (필수)</label>
         <select class="form-control" id="daily-proj"></select>
       </div>
-      <div class="form-group"><label>일자 * (필수)</label><input class="form-control" type="date" id="daily-date"></div>
+      <div class="form-group"><label>일자 * (필수)</label><input class="form-control" type="date" id="daily-date" min="1900-01-01" max="9999-12-31"></div>
       <div class="form-group"><label>작업내용 * (필수)</label><textarea class="form-control" id="daily-content" rows="3" placeholder="금일 작업내용을 입력하세요"></textarea></div>
-      <div class="form-group"><label>담당자 * (필수)</label><input class="form-control" id="daily-manager"></div>
+      <div class="form-group"><label>담당자</label><input class="form-control" id="daily-manager"></div>
 
       <div class="form-group" style="grid-column:1/-1;">
         <label>사진 (여러 장 선택 가능)</label>
@@ -1481,7 +1481,7 @@
         <label>공사 선택 * (필수)</label>
         <select class="form-control" id="tbm-project"></select>
       </div>
-      <div class="form-group"><label>날짜 *</label><input class="form-control" type="date" id="tbm-date"></div>
+      <div class="form-group"><label>날짜 *</label><input class="form-control" type="date" id="tbm-date" min="1900-01-01" max="9999-12-31"></div>
       <div class="form-group"><label>작업 내용 및 위험 요소 *</label><textarea class="form-control" id="tbm-hazards" rows="3"
           placeholder="작업 내용과 위험 요소를 입력하세요"></textarea></div>
       <div class="form-group"><label>안전 조치 사항 *</label><textarea class="form-control" id="tbm-measures" rows="3"
@@ -1507,7 +1507,7 @@
         <label>공사 선택 * (필수)</label>
         <select class="form-control" id="wp-project"></select>
       </div>
-      <div class="form-group"><label>작업일 *</label><input class="form-control" type="date" id="wp-date"></div>
+      <div class="form-group"><label>작업일 *</label><input class="form-control" type="date" id="wp-date" min="1900-01-01" max="9999-12-31"></div>
       <div class="form-group"><label>작업 내용 *</label><textarea class="form-control" id="wp-content" rows="3"></textarea>
       </div>
       <div class="form-group"><label>담당자</label><input class="form-control" id="wp-manager" placeholder="담당자명"></div>
@@ -1586,7 +1586,7 @@
       </div>
       <div class="grid-2" style="gap:12px;">
         <div class="form-group"><label>평가일자 <span style="color:#f85149">* (필수)</span></label>
-          <input type="date" class="form-control" id="risk-date"></div>
+          <input type="date" class="form-control" id="risk-date" min="1900-01-01" max="9999-12-31"></div>
         <div class="form-group"><label>평가자 <span style="color:#f85149">* (필수)</span></label>
           <input class="form-control" id="risk-evaluator" placeholder="작성자 성명"></div>
       </div>
@@ -1725,13 +1725,21 @@
       if (pageEl) pageEl.classList.add('active');
       if (navEl) navEl.classList.add('active');
       // 타이틀
-      const titles = { dashboard: '대시보드', project: '공사정보 관리', workers: '근로자 이력정보', workplan: '작업계획서', tbm: 'TBM 일지', risk: '위험성평가', docs: '문서 관리', auditlog: '감사 로그', accounts: '계정 관리', notice: '공지' };
+      const titles = { dashboard: '대시보드', project: '공사정보 관리', workers: '근로자 이력정보', workplan: '작업계획서', daily: '작업일보', tbm: 'TBM 일지', risk: '위험성평가', 'completed-projects': '준공현장', docs: '문서 관리', auditlog: '감사 로그', accounts: '계정 관리', notice: '공지' };
       document.getElementById('topbar-title').textContent = titles[page] || page;
       // 히스토리
       if (push) { navHistory = navHistory.slice(0, navIndex + 1); navHistory.push(page); navIndex = navHistory.length - 1; }
       // 데이터 로드
       const loaders = { dashboard: loadDashboard, project: loadProjectInfo, 'completed-projects': loadProjectInfo, workers: loadWorkers, workplan: loadWorkplans, daily: loadDailyReports, tbm: loadTbmList, risk: loadRiskAssessments, docs: loadDocs, auditlog: loadAuditLog, accounts: loadAccountsPending, notice: loadNotices };
-      if (loaders[page]) loaders[page]();
+      
+      // 탭 전환 시 마스터 테이블 콤보박스 최신화
+      if (['workers', 'workplan', 'daily', 'tbm', 'risk'].includes(page)) {
+          loadProjectDropdowns().then(() => {
+              if (loaders[page]) loaders[page]();
+          });
+      } else {
+          if (loaders[page]) loaders[page]();
+      }
       // 계정 관리는 관리자만
       if (page === 'accounts' && currentUser?.role !== 'admin') { toast('관리자만 접근 가능합니다.', 'error'); navigateTo('dashboard'); }
     }
@@ -2058,7 +2066,7 @@
         async function loadProjectDropdowns() {
       try {
         const viewAs = document.getElementById('view-as-employee')?.value || '';
-        const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
+        const data = await api(`/api/projects?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
         const projects = data.projects || [];
         
         // ONLY ACTIVE projects for the combo boxes!
@@ -2079,13 +2087,24 @@
           const el = document.getElementById(id);
           if (el) {
             const oldVal = el.value;
-            el.innerHTML = activeOpts;
+            const isFilter = id.startsWith('filter-');
             
-            const isValid = activeProjects.some(p => p.id === oldVal);
-            if (isValid) {
-                el.value = oldVal;
-            } else if (defaultId) {
-                el.value = defaultId;
+            if (isFilter) {
+                el.innerHTML = '<option value="all">전체보기</option>' + activeOpts;
+                const isValid = activeProjects.some(p => p.id === oldVal) || oldVal === 'all';
+                if (isValid) {
+                    el.value = oldVal;
+                } else {
+                    el.value = 'all';
+                }
+            } else {
+                el.innerHTML = activeOpts;
+                const isValid = activeProjects.some(p => p.id === oldVal);
+                if (isValid) {
+                    el.value = oldVal;
+                } else if (defaultId) {
+                    el.value = defaultId;
+                }
             }
           }
         });
@@ -2095,7 +2114,7 @@
     async function loadProjectInfo() {
       try {
         const viewAs = document.getElementById('view-as-employee')?.value || '';
-        const data = await api(`/api/project-info?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
+        const data = await api(`/api/projects?userId=${currentUser?.id || ''}&viewAsUserId=${viewAs}`);
         projectDataList = data.projects || [];
         const container = document.getElementById('proj-view');
         const isAdmin = currentUser?.role === 'admin';
@@ -2290,7 +2309,7 @@
       const manager = document.getElementById('daily-manager').value.trim();
       
       
-      if (!projId || !date || !content || !manager) { toast('필수 항목을 모두 입력하세요.', 'error'); return; }
+      if (!projId || !date || !content) { toast('필수 항목을 모두 입력하세요.', 'error'); return; }
       
       try {
         const fd = new FormData();
