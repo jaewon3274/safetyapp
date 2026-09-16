@@ -392,7 +392,7 @@ def get_deleted_employees():
     db = get_db()
     try:
         employees = rows_to_list(db.execute(
-            "SELECT id, name, department, team, status, created_at FROM users WHERE role='employee' AND status='deleted' ORDER BY created_at DESC"
+            "SELECT id, name, department, team, status, created_at FROM users WHERE role='employee' AND status IN ('deleted', 'suspended') ORDER BY created_at DESC"
         ).fetchall())
         return jsonify({'success': True, 'employees': employees})
     finally:
@@ -585,15 +585,15 @@ def toggle_user_status(uid):
         target = row_to_dict(db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone())
         if not target:
             return jsonify({'error': '사용자를 찾을 수 없습니다.'}), 404
-        new_status = 'active' if target['status'] == 'suspended' else 'suspended'
+        new_status = 'deleted'
         db.execute("UPDATE users SET status=? WHERE id=?", (new_status, uid))
         db.commit()
-        label = '활성화' if new_status == 'active' else '미사용'
+        label = '미사용'
         add_audit_log(admin['id'], admin['name'], admin['role'], 'USER_ROLE_CHANGE',
                       f"계정 상태 변경: [{target['name']}] → {new_status}")
         return jsonify({'success': True,
                         'newStatus': new_status,
-                        'message': f"{target['name']} 계정이 {label} 처리되었습니다."})
+                        'message': f"{target['name']} 계정이 {label} 처리(휴지통 이동) 되었습니다."})
     finally:
         db.close()
 

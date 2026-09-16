@@ -1993,10 +1993,10 @@
         const tbody = document.getElementById('employees-tbody');
         const list = data.employees || [];
         if (!list.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👥</div><p>등록된 직원이 없습니다.</p></div></td></tr>`; return; }
-        const activeList = list.filter(e => e.status !== 'deleted');
+        const activeList = list.filter(e => e.status === 'active');
         tbody.innerHTML = activeList.map((e, idx) => {
-          const badge = e.status === 'active' ? `<span class="badge badge-green">✅ 활성</span>` : `<span class="badge badge-amber">⏸ 미사용</span>`;
-          const toggleLabel = e.status === 'suspended' ? '✅ 활성화' : '⏸ 미사용';
+          const badge = `<span class="badge badge-green">✅ 활성</span>`;
+          const toggleLabel = '⏸ 미사용';
           return `<tr>
         <td style="text-align:center;"><input type="checkbox" class="emp-checkbox" value="${e.id}" style="margin-right:4px;"> ${idx + 1}</td>
         <td class="fw-600">${esc(e.name)}</td>
@@ -2015,8 +2015,8 @@
     }
 
     async function toggleUserStatus(uid, name, currentStatus) {
-      const label = currentStatus === 'suspended' ? '활성화' : '미사용';
-      confirm2(`계정 ${label}`, `"${name}" 계정을 ${label} 처리하시겠습니까?`, async () => {
+      const label = '미사용';
+      confirm2(`계정 ${label}`, `"${name}" 계정을 ${label} 처리하시겠습니까?\n(삭제 계정 목록으로 이동됩니다)`, async () => {
         try {
           const data = await api(`/api/auth/toggle-status/${uid}`, { method: 'POST', body: JSON.stringify({ adminUserId: currentUser?.id }) });
           toast(data.message, 'success'); loadEmployeeList();
