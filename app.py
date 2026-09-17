@@ -963,8 +963,8 @@ def batch_delete_projects():
         if len(remaining) == 0:
             return jsonify({'error': '최소 1개 이상의 공사정보가 유지되어야 합니다.'}), 400
         deleted_names = [p['project_name'] for p in all_projects if p['id'] in ids]
-        for pid in ids:
-            db.execute("DELETE FROM projects WHERE id=?", (pid,))
+        placeholders = ','.join(['?'] * len(ids))
+        db.execute(f"DELETE FROM projects WHERE id IN ({placeholders})", ids)
         db.commit()
         active_id = request.form.get('projectId') or get_active_project_id() or ''
         if active_id in ids:
@@ -1942,62 +1942,76 @@ def get_stats():
         
         if is_admin:
             # 관리자용: 전체 데이터 
-            docs_cnt = db.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
-            tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs").fetchone()[0]
-            plan_cnt = db.execute("SELECT COUNT(*) FROM workplans").fetchone()[0]
-            try:
-                daily_cnt = db.execute("SELECT COUNT(*) FROM daily_reports").fetchone()[0]
-            except:
-                daily_cnt = 0
-            try:
-                risk_cnt = db.execute("SELECT COUNT(*) FROM risk_assessments").fetchone()[0]
-            except:
-                risk_cnt = 0
+            try: tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs").fetchone()[0]
+            except: tbm_cnt = 0
+            try: plan_cnt = db.execute("SELECT COUNT(*) FROM workplans").fetchone()[0]
+            except: plan_cnt = 0
+            try: daily_cnt = db.execute("SELECT COUNT(*) FROM daily_reports").fetchone()[0]
+            except: daily_cnt = 0
+            try: risk_cnt = db.execute("SELECT COUNT(*) FROM risk_assessments").fetchone()[0]
+            except: risk_cnt = 0
             
-            # 전체 문서 = 문서관리 + TBM + 작업계획서 + 작업일보 + 위험성평가
+            doc_stats = db.execute("""
+                SELECT 
+                    COUNT(*) as docs_cnt,
+                    COALESCE(SUM(file_size), 0) as total_bytes,
+                    COALESCE(SUM(CASE WHEN file_type='excel' THEN 1 ELSE 0 END), 0) as excel_cnt,
+                    COALESCE(SUM(CASE WHEN file_type='image' THEN 1 ELSE 0 END), 0) as image_cnt,
+                    COALESCE(SUM(CASE WHEN file_type='pdf' THEN 1 ELSE 0 END), 0) as pdf_cnt,
+                    COALESCE(SUM(CASE WHEN file_type NOT IN ('excel','image','pdf') THEN 1 ELSE 0 END), 0) as other_cnt,
+                    COALESCE(SUM(CASE WHEN created_at LIKE ? THEN 1 ELSE 0 END), 0) as today_cnt,
+                    COALESCE(SUM(download_count), 0) as total_dl
+                FROM documents
+            """, (f'{today}%',)).fetchone()
+            
+            docs_cnt = doc_stats['docs_cnt']
+            total_bytes = doc_stats['total_bytes']
+            excel_cnt = doc_stats['excel_cnt']
+            image_cnt = doc_stats['image_cnt']
+            pdf_cnt = doc_stats['pdf_cnt']
+            other_cnt = doc_stats['other_cnt']
+            today_cnt = doc_stats['today_cnt']
+            total_dl = doc_stats['total_dl']
+            
             total_docs = docs_cnt + tbm_cnt + plan_cnt + daily_cnt + risk_cnt
-            
-            total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents").fetchone()[0]
-            excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel'").fetchone()[0]
-            image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image'").fetchone()[0]
-            pdf_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='pdf'").fetchone()[0]
-            other_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type NOT IN ('excel','image','pdf')").fetchone()[0]
-            today_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE created_at LIKE ?", (f'{today}%',)).fetchone()[0]
-            total_dl = db.execute("SELECT COALESCE(SUM(download_count),0) FROM documents").fetchone()[0]
             
             user_cnt = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             worker_cnt = db.execute("SELECT COUNT(*) FROM workers").fetchone()[0]
             proj_cnt = db.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
         else:
             # 일반 직원용: 본인 데이터 기준 
-            docs_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
-            try:
-                tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs WHERE creator_id=?", (user_id,)).fetchone()[0]
-            except:
-                tbm_cnt = 0
-            try:
-                plan_cnt = db.execute("SELECT COUNT(*) FROM workplans WHERE creator_id=?", (user_id,)).fetchone()[0]
-            except:
-                plan_cnt = 0
-            try:
-                daily_cnt = db.execute("SELECT COUNT(*) FROM daily_reports WHERE creator_id=?", (user_id,)).fetchone()[0]
-            except:
-                daily_cnt = 0
-            try:
-                risk_cnt = db.execute("SELECT COUNT(*) FROM risk_assessments WHERE creator_id=?", (user_id,)).fetchone()[0]
-            except:
-                risk_cnt = 0
+            try: tbm_cnt = db.execute("SELECT COUNT(*) FROM tbm_logs WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except: tbm_cnt = 0
+            try: plan_cnt = db.execute("SELECT COUNT(*) FROM workplans WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except: plan_cnt = 0
+            try: daily_cnt = db.execute("SELECT COUNT(*) FROM daily_reports WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except: daily_cnt = 0
+            try: risk_cnt = db.execute("SELECT COUNT(*) FROM risk_assessments WHERE creator_id=?", (user_id,)).fetchone()[0]
+            except: risk_cnt = 0
             
-            # 전체 문서 = 본인이 작성한 (문서관리 + TBM + 작업계획서 + 작업일보 + 위험성평가)
+            doc_stats = db.execute("""
+                SELECT 
+                    COUNT(*) as docs_cnt,
+                    COALESCE(SUM(file_size), 0) as total_bytes,
+                    COALESCE(SUM(CASE WHEN file_type='excel' THEN 1 ELSE 0 END), 0) as excel_cnt,
+                    COALESCE(SUM(CASE WHEN file_type='image' THEN 1 ELSE 0 END), 0) as image_cnt,
+                    COALESCE(SUM(CASE WHEN file_type='pdf' THEN 1 ELSE 0 END), 0) as pdf_cnt,
+                    COALESCE(SUM(CASE WHEN file_type NOT IN ('excel','image','pdf') THEN 1 ELSE 0 END), 0) as other_cnt,
+                    COALESCE(SUM(CASE WHEN created_at LIKE ? THEN 1 ELSE 0 END), 0) as today_cnt,
+                    COALESCE(SUM(download_count), 0) as total_dl
+                FROM documents WHERE uploader_id=?
+            """, (f'{today}%', user_id)).fetchone()
+            
+            docs_cnt = doc_stats['docs_cnt']
+            total_bytes = doc_stats['total_bytes']
+            excel_cnt = doc_stats['excel_cnt']
+            image_cnt = doc_stats['image_cnt']
+            pdf_cnt = doc_stats['pdf_cnt']
+            other_cnt = doc_stats['other_cnt']
+            today_cnt = doc_stats['today_cnt']
+            total_dl = doc_stats['total_dl']
+            
             total_docs = docs_cnt + tbm_cnt + plan_cnt + daily_cnt + risk_cnt
-
-            total_bytes = db.execute("SELECT COALESCE(SUM(file_size),0) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
-            excel_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='excel' AND uploader_id=?", (user_id,)).fetchone()[0]
-            image_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='image' AND uploader_id=?", (user_id,)).fetchone()[0]
-            pdf_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type='pdf' AND uploader_id=?", (user_id,)).fetchone()[0]
-            other_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE file_type NOT IN ('excel','image','pdf') AND uploader_id=?", (user_id,)).fetchone()[0]
-            today_cnt = db.execute("SELECT COUNT(*) FROM documents WHERE created_at LIKE ? AND uploader_id=?", (f'{today}%', user_id)).fetchone()[0]
-            total_dl = db.execute("SELECT COALESCE(SUM(download_count),0) FROM documents WHERE uploader_id=?", (user_id,)).fetchone()[0]
             
             user_cnt = 0 # 일반 직원은 사용자 수를 볼 필요가 없거나 0으로 처리
             

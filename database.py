@@ -13,9 +13,12 @@ ADMIN_PASSWORD = '240124!'
 
 
 
+pg_pool = None
+
 class PostgresWrapper:
-    def __init__(self, conn):
+    def __init__(self, conn, pool=None):
         self.conn = conn
+        self.pool = pool
 
     def cursor(self):
         return PostgresCursorWrapper(self.conn.cursor())
@@ -37,7 +40,10 @@ class PostgresWrapper:
         self.conn.commit()
 
     def close(self):
-        self.conn.close()
+        if self.pool:
+            self.pool.putconn(self.conn)
+        else:
+            self.conn.close()
 
 
 class PostgresCursorWrapper:
@@ -87,24 +93,32 @@ def get_db():
     """DB 연결 반환"""
     db_url = os.environ.get('DATABASE_URL')
     if db_url:
+        global pg_pool
         import time
         import psycopg2
         import psycopg2.extras
+        from psycopg2 import pool
+        
         if db_url.startswith('postgres://'):
             db_url = db_url.replace('postgres://', 'postgresql://', 1)
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                conn = psycopg2.connect(db_url, cursor_factory=psycopg2.extras.DictCursor)
-                conn.autocommit = False
-                return PostgresWrapper(conn)
-            except Exception as e:
-                print(f"[DB Connection Error] Attempt {attempt+1} failed: {e}")
-                if attempt == max_retries - 1:
-                    print("Supabase 연결 최종 실패. DATABASE_URL 환경 변수가 IPv4 (Connection Pooler) 주소인지 확인하세요.")
-                    raise
-                time.sleep(2)
+            
+        if pg_pool is None:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    # Initialize threaded connection pool (min=1, max=20)
+                    pg_pool = pool.ThreadedConnectionPool(1, 20, db_url, cursor_factory=psycopg2.extras.DictCursor)
+                    break
+                except Exception as e:
+                    print(f"[DB Pool Init Error] Attempt {attempt+1} failed: {e}")
+                    if attempt == max_retries - 1:
+                        print("Supabase 연결 최종 실패. DATABASE_URL 환경 변수를 확인하세요.")
+                        raise
+                    time.sleep(2)
+                    
+        conn = pg_pool.getconn()
+        conn.autocommit = False
+        return PostgresWrapper(conn, pg_pool)
                 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
