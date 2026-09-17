@@ -186,6 +186,16 @@ def get_user_assigned_project_ids(user_id: str) -> list:
         db.close()
 
 # ── 메인 페이지 ──────────────────────────────────────────────
+
+with app.app_context():
+    try:
+        from database import init_db
+        init_db()
+        print("Database initialized successfully.")
+    except Exception as e:
+        print(f"DB Init Error: {e}")
+
+
 @app.route('/')
 def index():
     resp = make_response(render_template('index.html'))
@@ -638,15 +648,25 @@ def get_employees():
         employees = rows_to_list(db.execute(
             "SELECT id, name, department, team, status, created_at FROM users WHERE role='employee' AND status='active' ORDER BY created_at DESC"
         ).fetchall())
-        # 각 직원의 배정 현장 목록 추가
-        for emp in employees:
+        # 각 직원의 배정 현장 목록 추가 (N+1 쿼리 최적화)
+        if employees:
+            emp_ids = [emp['id'] for emp in employees]
+            placeholders = ','.join(['?'] * len(emp_ids))
             rows = db.execute(
-                """SELECT p.id, p.project_name FROM user_site_assignments usa
-                   JOIN projects p ON p.id=usa.project_id WHERE usa.user_id=?
+                f"""SELECT usa.user_id, p.id, p.project_name 
+                   FROM user_site_assignments usa
+                   JOIN projects p ON p.id=usa.project_id 
+                   WHERE usa.user_id IN ({placeholders})
                    ORDER BY usa.assigned_at""",
-                (emp['id'],)
+                emp_ids
             ).fetchall()
-            emp['assigned_projects'] = [{'id': r['id'], 'project_name': r['project_name']} for r in rows]
+            
+            assignments = {eid: [] for eid in emp_ids}
+            for r in rows:
+                assignments[r['user_id']].append({'id': r['id'], 'project_name': r['project_name']})
+                
+            for emp in employees:
+                emp['assigned_projects'] = assignments[emp['id']]
         return jsonify({'success': True, 'employees': employees})
     finally:
         db.close()

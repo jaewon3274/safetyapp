@@ -12,8 +12,100 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'smart_dms.db')
 ADMIN_PASSWORD = '240124!'
 
 
+
+class PostgresWrapper:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def cursor(self):
+        return PostgresCursorWrapper(self.conn.cursor())
+
+    def execute(self, query, params=()):
+        return self.cursor().execute(query, params)
+
+    def executemany(self, query, params_list):
+        return self.cursor().executemany(query, params_list)
+
+    def executescript(self, script):
+        cursor = self.cursor()
+        for stmt in script.split(';'):
+            if stmt.strip():
+                cursor.execute(stmt)
+        return cursor
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.conn.close()
+
+
+class PostgresCursorWrapper:
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def _translate(self, query):
+        import re
+        q = query.replace('%', '%%').replace('?', '%s')
+        
+        pragma_match = re.search(r'PRAGMA table_info\((.*?)\)', q, re.IGNORECASE)
+        if pragma_match:
+            table_name = pragma_match.group(1).strip()
+            # SQLite PRAGMA table_info returns name at index 1
+            q = f"SELECT 0 as cid, column_name as name FROM information_schema.columns WHERE table_name='{table_name}'"
+            
+        if 'INSERT OR REPLACE INTO APP_CONFIG' in q.upper():
+            q = re.sub(r'(?i)INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', q)
+            q += " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+            
+        return q
+
+    def execute(self, query, params=()):
+        q = self._translate(query)
+        self.cursor.execute(q, params)
+        return self
+
+    def executemany(self, query, params_list):
+        q = self._translate(query)
+        self.cursor.executemany(q, params_list)
+        return self
+
+    def executescript(self, script):
+        for stmt in script.split(';'):
+            if stmt.strip():
+                self.execute(stmt)
+        return self
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+
+
 def get_db():
     """DB 연결 반환"""
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        import time
+        import psycopg2
+        import psycopg2.extras
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                conn = psycopg2.connect(db_url, cursor_factory=psycopg2.extras.DictCursor)
+                conn.autocommit = False
+                return PostgresWrapper(conn)
+            except Exception as e:
+                print(f"[DB Connection Error] Attempt {attempt+1} failed: {e}")
+                if attempt == max_retries - 1:
+                    print("Supabase 연결 최종 실패. DATABASE_URL 환경 변수가 IPv4 (Connection Pooler) 주소인지 확인하세요.")
+                    raise
+                time.sleep(2)
+                
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -237,7 +329,7 @@ def init_db():
             extra_notes      TEXT DEFAULT '',
             site_manager     TEXT DEFAULT '',
             safety_manager   TEXT DEFAULT '',
-            updated_at       TEXT NOT NULL,
+            updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_by       TEXT NOT NULL DEFAULT ''
         );
 
@@ -425,7 +517,7 @@ def init_db():
          '2026-05-02T11:00:00', '관리자'),
     ]
     c.executemany(
-        "INSERT INTO projects VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", projects
+        "INSERT INTO projects (id, project_name, contract_amount, start_date, end_date, period_text, client_name, contractor_name, location, description, updated_at, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", projects
     )
 
     c.execute("INSERT OR REPLACE INTO app_config VALUES ('active_project_id', 'proj_2')")
@@ -442,7 +534,7 @@ def init_db():
          'IPARK리조트 3단계 신축 공사', '2026-03-01T08:00:00', '2026-03-01T08:00:00'),
     ]
     c.executemany(
-        "INSERT INTO workers VALUES (?,?,?,?,?,?,?,?,?,?,?)", workers
+        "INSERT INTO workers (id, project_id, name, birth_date, gender, nationality, contact, job_type, site_name, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", workers
     )
 
     # 작업계획서
@@ -461,7 +553,7 @@ def init_db():
          'usr_admin_1', '관리자', '2026-03-01T09:00:00', '2026-03-01T09:00:00'),
     ]
     c.executemany(
-        """INSERT INTO work_plans VALUES
+        """INSERT INTO work_plans (id, project_id, site_name, company_name, created_date, plan_category, heavy_handling, machinery_name, equipment_plan_type, specification, vehicle_number, equipment_year, registered_vendor, insurance_expiry_date, inspection_validity_date, ndt_testing_date, training_date, usage_start_date, usage_end_date, usage_location, creator_id, creator_name, created_at, updated_at) VALUES
            (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         work_plans
     )
@@ -476,7 +568,7 @@ def init_db():
          now[:10], 'usr_admin_1', '관리자', now, now),
     ]
     c.executemany(
-        "INSERT INTO tbm_logs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", tbm_logs
+        "INSERT INTO tbm_logs (id, project_id, project_name, project_period, instructor, work_details_hazards, safety_measures, special_notes, created_date, creator_id, creator_name, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", tbm_logs
     )
 
     # 문서 (샘플)
